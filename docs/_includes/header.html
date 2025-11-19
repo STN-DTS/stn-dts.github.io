@@ -1,0 +1,11 @@
+<header class="site-header">
+  <a class="site-title" href="{{ '/' | relative_url }}">{{ site.title | escape }}</a>
+  <nav class="site-nav">
+    <a href="{{ '/' | relative_url }}">Home</a>
+    <a href="{{ '/about/' | relative_url }}">About</a>
+    <div class="search-container">
+      <input type="text" id="search-input" placeholder="Search...">
+      <div id="search-results" class="search-results"></div>
+    </div>
+  </nav>
+</header>

@@ -3,7 +3,10 @@ layout: post
 title: "A Case for Invariant Domains"
 date: 2025-11-06
 author: Greg Baker
-categories: software engineering, domain driven design
+categories:
+- software-engineering
+- domain-driven-design
+- ddd
 ---
 
 Over the last decade or so, I've observed (and even participated in) a troubling

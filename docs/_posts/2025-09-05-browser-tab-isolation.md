@@ -3,7 +3,7 @@ layout: post
 title: A practical guide to browser tab isolation in React Router v7
 author: Greg Baker
 date: 2025-09-05
-categories: i18n react-router
+categories: react-router browser
 ---
 
 If you've built a complex web app, you've likely seen it: a user has multiple tabs open, and suddenly data from one tab

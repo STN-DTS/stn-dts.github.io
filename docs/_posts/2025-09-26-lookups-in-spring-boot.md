@@ -3,7 +3,7 @@ layout: post
 title: A quick guide to handling code tables in Spring Boot
 author: Greg Baker
 date: 2025-09-26
-categories: spring-boot
+categories: spring-boot java backend
 ---
 
 Managing lookup tables (or "code tables") is a common task in API development.

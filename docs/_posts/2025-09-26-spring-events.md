@@ -3,7 +3,7 @@ layout: post
 title: Decoupling components with asynchronous events in Spring Boot
 author: Greg Baker
 date: 2025-09-26
-categories: spring-boot
+categories: spring-boot java backend
 ---
 
 As software engineers, we strive to write code that is clean, maintainable, and

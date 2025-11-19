@@ -3,7 +3,7 @@ layout: post
 title: Environment variable management in a React Router v7 application
 author: Greg Baker
 date: 2025-09-05
-categories: i18n react-router
+categories: react-router environment-variables
 ---
 
 Managing environment variables in a modern web application can be tricky. This post outlines a strategy for managing environment

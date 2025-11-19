@@ -1,5 +1,7 @@
 title: Digital Technology Solutions
 url: https://stn-dts.github.io
-theme: minima
+
+permalink: /:year/:month/:day/:title.html
+
 plugins:
   - jekyll-feed

@@ -3,7 +3,7 @@ layout: post
 title: Selective CI for monorepos -- detecting changes and running only the jobs you need
 author: Greg Baker
 date: 2025-10-21
-categories: ci/cd github-actions monorepo
+categories: ci/cd github-actions monorepo devops
 ---
 
 This post explains how a repository-level GitHub workflow can detect changes in
@@ -25,8 +25,8 @@ post):
   `backend/`, `frontend/`, and `gitops/`.
 - `detect-changes` job outputs: the job exposes `backend-changed`,
   `frontend-changed`, and `gitops-changed` outputs that other jobs use.
-- Conditional `if` checks on jobs: `if: ${{
-  needs.detect-changes.outputs.backend-changed == 'true' }}` ensures a job runs
+- Conditional `if` checks on jobs: `if: {% raw %}${{
+  needs.detect-changes.outputs.backend-changed == 'true' }}{% endraw %}` ensures a job runs
   only when the relevant folder changed.
 
 The example workflow (see the sample at the end of this post) runs on `push` and
@@ -137,8 +137,8 @@ not as failures, so they don't cause the PR to be blocked.
 
 - Action outputs are strings: Outputs from `dorny/paths-filter` are string
   values (`"true"` or `"false"`). Ensure your `if` conditions compare them as
-  strings, e.g., `if: ${{ needs.detect-changes.outputs.backend-changed == 'true'
-  }}`.
+  strings, e.g., `if: {% raw %}${{ needs.detect-changes.outputs.backend-changed == 'true'
+  }}{% endraw %}`.
 
 - Job ordering and `needs`: Downstream jobs must declare `needs: detect-changes`
   to access the outputs.
@@ -206,6 +206,7 @@ Below is a generic, self-contained example workflow you can copy into
 `.github/workflows/` or keep as a reference in the post.
 
 ``` yaml
+{% raw %}
 name: Build and test solution
 permissions: read-all
 
@@ -320,4 +321,5 @@ jobs:
         working-directory: frontend/
       - run: podman build --file containerfile .
         working-directory: frontend/
+{% endraw %}
 ```

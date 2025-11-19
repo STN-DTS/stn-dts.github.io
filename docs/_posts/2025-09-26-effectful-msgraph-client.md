@@ -3,7 +3,7 @@ layout: post
 title: Creating an MSGraph client using Effect-TS
 author: Greg Baker
 date: 2025-09-26
-categories: effect-ts msgraph
+categories: effect-ts msgraph typescript
 ---
 
 Interacting with external APIs is a cornerstone of modern software development.

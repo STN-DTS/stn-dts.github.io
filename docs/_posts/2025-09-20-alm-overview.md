@@ -3,7 +3,7 @@ layout: post
 title: "How we ship: from branch to production"
 author: Greg Baker
 date: 2025-09-20
-categories: alm devops git
+categories: alm devops git software-engineering
 ---
 
 Finding the sweet spot between moving fast and not breaking things is a classic developer dilemma. How do you ship features

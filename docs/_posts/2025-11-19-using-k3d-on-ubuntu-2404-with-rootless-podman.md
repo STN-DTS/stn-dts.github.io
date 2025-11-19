@@ -3,7 +3,12 @@ layout: post
 title: "Using k3d on Ubuntu 24.04 with rootless Podman"
 date: 2025-11-19
 author: Greg Baker
-categories: kubernetes, k3d, podman
+categories:
+- kubernetes
+- k3d
+- podman
+- ubuntu
+- linux
 ---
 
 # Using k3d on Ubuntu 24.04 with rootless Podman

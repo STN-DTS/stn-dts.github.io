@@ -3,7 +3,7 @@ layout: post
 title: Building a custom express server for a React Router v7 application
 author: Greg Baker
 date: 2025-09-05
-categories: i18n react-router
+categories: react-router server
 ---
 
 This document provides a comprehensive guide for creating a custom Express server tailored for a React Router v7 application. It

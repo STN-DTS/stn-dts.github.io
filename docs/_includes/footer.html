@@ -1,0 +1,29 @@
+<footer class="site-footer">
+    <div class="container">
+        <p>&copy; {{ site.time | date: '%Y' }} {{ site.title | escape }}. All rights reserved.</p>
+    </div>
+    <script>
+        window.searchJsonPath = "{{ '/search.json' | relative_url }}";
+    </script>
+    <script src="{{ '/assets/js/search.js' | relative_url }}"></script>
+    <script>
+        // Add anchor links to headings
+        document.addEventListener('DOMContentLoaded', function() {
+            const headings = document.querySelectorAll('.post-content h1, .post-content h2, .post-content h3, .post-content h4, .post-content h5, .post-content h6');
+            headings.forEach(heading => {
+                // Ensure heading has an ID
+                if (!heading.id) {
+                    heading.id = heading.textContent.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                }
+                // Create anchor link
+                const anchor = document.createElement('a');
+                anchor.href = '#' + heading.id;
+                anchor.innerHTML = '#';
+                anchor.className = 'heading-anchor';
+                anchor.title = 'Link to this section';
+                // Insert at the beginning of the heading
+                heading.insertBefore(anchor, heading.firstChild);
+            });
+        });
+    </script>
+</footer>

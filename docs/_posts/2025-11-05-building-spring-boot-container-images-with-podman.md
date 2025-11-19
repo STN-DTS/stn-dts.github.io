@@ -3,7 +3,7 @@ layout: post
 title: Building Spring Boot container images with Podman
 author: Greg Baker
 date: 2025-11-05
-categories: spring-boot podman containers
+categories: spring-boot podman containers java
 ---
 
 ## Introduction
