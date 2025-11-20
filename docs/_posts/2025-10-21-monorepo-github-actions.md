@@ -205,7 +205,7 @@ script.
 Below is a generic, self-contained example workflow you can copy into
 `.github/workflows/` or keep as a reference in the post.
 
-``` yaml
+```yaml
 {% raw %}
 name: Build and test solution
 permissions: read-all

@@ -37,7 +37,7 @@ will fail, preventing malformed data from propagating through our system.
 First, let's define a schema for a Microsoft Graph User. We only care about a
 few fields for our purposes.
 
-``` typescript
+```typescript
 // src/msgraph/schemas.ts
 import { Schema } from 'effect';
 
@@ -53,7 +53,7 @@ export type MSGraphUser = Schema.Schema.Type<typeof MSGraphUser>;
 Next, we need a way to parse paginated responses, which are common in the Graph
 API. We can create a generic schema factory for this:
 
-``` typescript
+```typescript
 // src/msgraph/schemas.ts
 export const PagedResponse = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
   Schema.Struct({
@@ -70,7 +70,7 @@ schema for a paginated list of that type. We'll see it in action shortly.
 Instead of throwing generic errors, we can create a custom, structured error
 type for our client. Effect's `Data.TaggedError` makes this trivial.
 
-``` typescript
+```typescript
 // src/msgraph/errors.ts
 import { Data } from 'effect';
 
@@ -96,7 +96,7 @@ First, we need to get an access token. We'll use the OAuth client credentials
 flow. This involves sending a `POST` request with our application's credentials
 to the Microsoft identity platform.
 
-``` typescript
+```typescript
 // src/msgraph/client.ts
 import { HttpClient, HttpClientRequest, HttpClientResponse } from '@effect/platform';
 import { Effect } from 'effect';
@@ -155,7 +155,7 @@ Now that we can authenticate, let's fetch the members of a group. The Graph API
 provides endpoints for getting both direct and transitive (nested) members. The
 logic is nearly identical for both.
 
-``` typescript
+```typescript
 // src/msgraph/client.ts
 export const getDirectGroupMembers = (authToken: string, groupId: string) =>
   Effect.gen(function* () {
@@ -203,7 +203,7 @@ To add members, we can use the `members@odata.bind` property in a `PATCH`
 request. The API allows up to 20 members to be added in a single request. We can
 split our user list into chunks of 20 and send all the requests in parallel.
 
-``` typescript
+```typescript
 // src/msgraph/client.ts
 import { Chunk, Effect } from 'effect';
 
@@ -252,7 +252,7 @@ succeed with a `200 OK` status, but individual operations *within* the batch can
 fail. We must inspect the body of the response to know if the entire operation
 was a success.
 
-``` typescript
+```typescript
 // src/msgraph/client.ts
 export const removeMembersFromGroup = (authToken: string, groupId: string, users: MSGraphUser[]) =>
   Effect.gen(function* () {

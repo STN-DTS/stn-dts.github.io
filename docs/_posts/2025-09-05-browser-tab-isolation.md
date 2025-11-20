@@ -31,7 +31,7 @@ isolated data context.
 The `useTabId` hook uses React's `useSyncExternalStore` to keep the tab ID in sync between `sessionStorage` and your component's
 state. Here's a look at the implementation:
 
-```typescript
+```tsx
 import { useEffect, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { randomString } from '~/utils/string-utils';
@@ -89,7 +89,7 @@ The hook's logic is straightforward:
 
 Here's how to use the `useTabId` hook in a React component:
 
-```typescript
+```tsx
 import { useTabId } from '~/hooks/use-tab-id';
 
 function MyComponent() {

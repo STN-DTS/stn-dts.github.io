@@ -43,7 +43,7 @@ Our lookup tables are simple. For example, a `PROFILE_STATUS` table might look l
 We represent this with a JPA entity. We can use a base class like
 `AbstractCodeEntity` to hold common fields.
 
-``` java
+```java
 // AbstractCodeEntity.java
 @MappedSuperclass
 public abstract class AbstractCodeEntity {
@@ -62,7 +62,7 @@ public abstract class AbstractCodeEntity {
 
 And the specific entity for our profile statuses:
 
-``` java
+```java
 // ProfileStatusEntity.java
 @Entity(name = "ProfileStatus")
 @Table(name = "[PROFILE_STATUS]")

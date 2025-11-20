@@ -28,7 +28,7 @@ profile to the database, it needs to perform several other tasks:
 
 A naive implementation might look like this:
 
-``` java
+```java
 @Service
 public class ProfileService {
 
@@ -180,7 +180,7 @@ To fix this, we can make our listeners asynchronous with two simple annotations:
    Add this to a configuration class to enable asynchronous processing in your
    application.
 
-    ``` java
+    ```java
     // AsyncConfig.java
     @EnableAsync
     @Configuration
@@ -192,7 +192,7 @@ To fix this, we can make our listeners asynchronous with two simple annotations:
 2. **`@Async`:**
    Add this to your listener methods.
 
-    ``` java
+    ```java
     // ProfileEventListener.java
     @Component
     public class ProfileEventListener {

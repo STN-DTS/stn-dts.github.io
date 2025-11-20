@@ -30,7 +30,7 @@ Rootless Podman requires cgroup delegation to manage resources in user services.
 
 Create `/etc/systemd/system/user@.service.d/delegate.conf` with:
 
-```
+```ini
 [Service]
 Delegate=cpu cpuset io memory pids
 ```

@@ -146,7 +146,7 @@ Instead of bundling client-side environment variables directly into the client-s
 
 When the application loads, the `root.tsx` component renders a `<script>` tag that points to this endpoint.
 
-```typescript
+```tsx
 // app/root.tsx
 export default function App({ loaderData }: Route.ComponentProps) {
   const { currentLanguage } = useLanguage();

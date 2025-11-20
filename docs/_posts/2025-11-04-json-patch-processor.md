@@ -285,7 +285,6 @@ public class JsonPatchProcessor {
 	}
 
 }
-
 ```
 
 ## Spring converters
