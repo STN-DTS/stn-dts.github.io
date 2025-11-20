@@ -1,8 +1,20 @@
 (function () {
   const searchInput = document.getElementById('search-input');
   const searchResults = document.getElementById('search-results');
+  const searchToggle = document.getElementById('search-toggle');
+  const searchContainer = document.querySelector('.search-container');
 
   if (!searchInput || !searchResults) return;
+
+  if (searchToggle && searchContainer) {
+    searchToggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      searchContainer.classList.toggle('active');
+      if (searchContainer.classList.contains('active')) {
+        searchInput.focus();
+      }
+    });
+  }
 
   let posts = [];
 
