@@ -22,11 +22,13 @@ compatible with Docker's CLI and image formats.
 
 ## Configuration Steps
 
-### 1. Configure the Spring Boot Maven plugin
+### 1. Configure the Spring Boot Maven or Gradle plugin
 
-In your `pom.xml`, you need to configure the Spring Boot Maven plugin to bind
-the host to the builder. This allows the build process to access the Podman
-socket.
+You need to configure the Spring Boot plugin to bind the host to the builder.
+This allows the build process (which runs inside a container) to access the
+Podman socket on the host.
+
+**Maven (`pom.xml`):**
 
 ```xml
 <plugin>
@@ -38,6 +40,16 @@ socket.
     </image>
   </configuration>
 </plugin>
+```
+
+**Gradle (`build.gradle`):**
+
+```groovy
+tasks.named("bootBuildImage") {
+    docker {
+        bindHostToBuilder = true
+    }
+}
 ```
 
 Setting `bindHostToBuilder` to `true` enables the builder to access host
@@ -53,21 +65,29 @@ systemctl --user enable --now podman.socket
 ```
 
 This command enables and starts the Podman socket service for your user session.
-The socket will be available at `/run/user/${UID}/podman/podman.sock`
-(where `1000` is typically your user ID).
+The socket will be available at `/run/user/${UID}/podman/podman.sock` (where
+`1000` is typically your user ID).
 
 ### 3. Set the `DOCKER_HOST` environment variable
 
 Spring Boot's build-image goal expects to communicate with Docker, but you can
-point it to Podman by setting the `DOCKER_HOST` environment variable:
+point it to Podman by setting the `DOCKER_HOST` environment variable.
+
+**Maven:**
 
 ```bash
-DOCKER_HOST=unix:///run/user/${UID}/podman/podman.sock mvn spring-boot:build-image --define maven.test.skip=true
+DOCKER_HOST=unix:///run/user/${UID}/podman/podman.sock mvn spring-boot:build-image -Dmaven.test.skip=true
+```
+
+**Gradle:**
+
+```bash
+DOCKER_HOST=unix:///run/user/${UID}/podman/podman.sock ./gradlew bootBuildImage -x test
 ```
 
 This tells the build process to use the Podman socket instead of the default
-Docker socket. The `--define maven.test.skip=true` flag skips running tests
-during the build, which can speed up the process.
+Docker socket. Skipping tests is optional but recommended for faster builds if
+you've already verified your code.
 
 ## Why these steps are necessary
 
@@ -86,11 +106,7 @@ during the build, which can speed up the process.
 ## Building the image
 
 Once configured, you can build your Spring Boot application into a container
-image:
-
-```bash
-DOCKER_HOST=unix:///run/user/${UID}/podman/podman.sock mvn spring-boot:build-image --define maven.test.skip=true
-```
+image using the commands from Step 3.
 
 The resulting image will be built using Podman and stored in your local Podman
 registry. You can list it with:
@@ -105,14 +121,60 @@ And run it with:
 podman run --interactive --rm --tty --network host your-app-name:latest
 ```
 
-## Troubleshooting
+## Troubleshooting & Tips
 
-If you encounter issues:
+### SELinux on Fedora/RHEL
 
-1. Verify Podman is installed: `podman --version`
-2. Check the socket is running: `systemctl --user status podman.socket`
-3. Ensure the socket path is correct for your user ID: `echo $UID`
-4. Test Podman connectivity: `podman info`
+If you are running on an SELinux-enabled system (like Fedora or RHEL), you might
+encounter permission denied errors when the builder tries to access the socket.
+You may need to ensure the socket is labeled correctly or temporarily set
+SELinux to permissive mode to verify if it's the culprit.
+
+### Storage Driver Performance
+
+Podman works best with the `overlay` storage driver. If your builds are
+exceptionally slow, check your storage driver:
+
+```bash
+podman info --format '{{.Store.GraphDriverName}}'
+```
+
+If it returns `vfs`, you should configure `fuse-overlayfs` for better
+performance.
+
+### Customizing the Image Name
+
+By default, the image name is derived from your project's artifact ID and
+version. You can customize this in your configuration:
+
+**Maven:**
+
+```xml
+<configuration>
+  <image>
+    <name>my-registry.com/my-org/${project.artifactId}:${project.version}</name>
+    <bindHostToBuilder>true</bindHostToBuilder>
+  </image>
+</configuration>
+```
+
+**Gradle:**
+
+```groovy
+bootBuildImage {
+    imageName = "my-registry.com/my-org/${project.name}:${project.version}"
+    docker {
+        bindHostToBuilder = true
+    }
+}
+```
+
+### Common Issues
+
+1. **Socket not found**: Verify the socket path exists.
+2. **Permission denied**: Ensure your user has access to the socket.
+3. **Builder failure**: Run with `-X` (Maven) or `--debug` (Gradle) to see
+   detailed logs from the buildpack.
 
 ## Conclusion
 

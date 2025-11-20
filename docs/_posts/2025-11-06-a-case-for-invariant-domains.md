@@ -61,65 +61,66 @@ Consider a simple `BankAccount` example:
 ```java
 public class BankAccount {
 
-    private BigDecimal balance;
-    private boolean frozen;
+	private BigDecimal balance;
+	private boolean frozen;
 
-    public BankAccount(BigDecimal initialBalance) {
-        if (initialBalance == null) {
-            throw new IllegalArgumentException("Initial balance cannot be null");
-        }
+	public BankAccount(BigDecimal initialBalance) {
+		if (initialBalance == null) {
+			throw new IllegalArgumentException("Initial balance cannot be null");
+		}
 
-        if (initialBalance.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Initial balance cannot be negative");
-        }
+		if (initialBalance.compareTo(BigDecimal.ZERO) < 0) {
+			throw new IllegalArgumentException("Initial balance cannot be negative");
+		}
 
-        this.balance = initialBalance;
-        this.frozen = false;
-    }
+		this.balance = initialBalance;
+		this.frozen = false;
+	}
 
-    public void deposit(BigDecimal amount) {
-        if (amount == null) {
-            throw new IllegalArgumentException("Deposit amount cannot be null");
-        }
+	public void deposit(BigDecimal amount) {
+		if (amount == null) {
+			throw new IllegalArgumentException("Deposit amount cannot be null");
+		}
 
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Deposit amount must be positive");
-        }
+		if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new IllegalArgumentException("Deposit amount must be positive");
+		}
 
-        if (frozen) {
-            throw new IllegalStateException("Cannot deposit to frozen account");
-        }
+		if (frozen) {
+			throw new IllegalStateException("Cannot deposit to frozen account");
+		}
 
-        this.balance = this.balance.add(amount);
-    }
+		this.balance = this.balance.add(amount);
+	}
 
-    public void withdraw(BigDecimal amount) {
-        if (amount == null) {
-            throw new IllegalArgumentException("Withdrawal amount cannot be null");
-        }
+	public void withdraw(BigDecimal amount) {
+		if (amount == null) {
+			throw new IllegalArgumentException("Withdrawal amount cannot be null");
+		}
 
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Withdrawal amount must be positive");
-        }
+		if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new IllegalArgumentException("Withdrawal amount must be positive");
+		}
 
-        if (frozen) {
-            throw new IllegalStateException("Cannot withdraw from frozen account");
-        }
+		if (frozen) {
+			throw new IllegalStateException("Cannot withdraw from frozen account");
+		}
 
-        if (this.balance.compareTo(amount) < 0) {
-            throw new IllegalStateException("Insufficient funds");
-        }
+		if (this.balance.compareTo(amount) < 0) {
+			throw new IllegalStateException("Insufficient funds");
+		}
 
-        this.balance = this.balance.subtract(amount);
-    }
+		this.balance = this.balance.subtract(amount);
+	}
 
-    public void freeze() {
-        this.frozen = true;
-    }
+	public void freeze() {
+		this.frozen = true;
+	}
 
-    public BigDecimal getBalance() {
-        return balance;
-    }
+	public BigDecimal getBalance() {
+		return balance;
+	}
+
 }
 ```
 
@@ -134,6 +135,34 @@ Here, the `BankAccount` class enforces key invariants:
 These rules are encapsulated within the object, making it impossible to create
 or mutate the account into an invalid state. Calling code can trust that any
 `BankAccount` instance is always valid.
+
+## The Role of Value Objects
+
+One of the most effective ways to enforce invariants is through Value Objects.
+Instead of using primitive types like `BigDecimal` or `String` directly in your
+entities, wrap them in strongly-typed objects that enforce their own internal
+rules.
+
+For example, instead of passing a raw `BigDecimal` to `deposit`, we could use a
+`Money` value object:
+
+```java
+public record Money(BigDecimal amount) {
+	public Money {
+		if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
+			throw new IllegalArgumentException("Money amount cannot be negative");
+		}
+	}
+
+	public Money add(Money other) {
+		return new Money(this.amount.add(other.amount));
+	}
+	// ... other operations
+}
+```
+
+This simplifies the `BankAccount` entity, as it no longer needs to validate that
+the amount is positive—the `Money` type guarantees it.
 
 ## Industry perspectives
 
@@ -179,10 +208,26 @@ Adopting invariant-rich domains yields tangible benefits:
 
 Transitioning to rich domain models isn't without hurdles. Developers accustomed
 to anemic models may initially struggle with placing logic in the "right" place.
-Additionally, ensuring invariants don't conflict with database constraints
-requires careful design.
 
-Mitigations include:
+### Addressing Persistence Challenges
+
+A common objection to rich domain models is the friction with Object-Relational
+Mappers (ORMs) like Hibernate or Entity Framework. These tools often require
+public no-argument constructors and setters to hydrate objects from the
+database, which can undermine encapsulation.
+
+To bridge this gap:
+
+* **Private Constructors**: Most modern ORMs can use private or protected
+  constructors and field access, allowing you to keep your public API clean.
+* **Mapping Layers**: Separate your domain model from your persistence model.
+  Use a "dumb" data object for the database and map it to your rich domain
+  entity. This decoupling allows your domain logic to evolve independently of
+  your database schema.
+* **Memento Pattern**: Expose a snapshot of the state for persistence without
+  exposing mutators.
+
+### Other Mitigations
 
 - Starting small: Begin by adding invariants to new or refactored classes
 - Using aggregate roots in DDD to manage complex object graphs

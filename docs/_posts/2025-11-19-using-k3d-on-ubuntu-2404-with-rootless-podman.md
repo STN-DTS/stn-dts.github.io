@@ -23,17 +23,28 @@ Ensure the following are installed:
 - Podman configured for rootless operation
 - k3d (install via `curl -s
   https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`)
+- kubectl (for interacting with the cluster)
 
 ## Step 1: Enable cgroup `CPU`, `CPUSET`, and `I/O` delegation
 
 Rootless Podman requires cgroup delegation to manage resources in user services.
 
-Create `/etc/systemd/system/user@.service.d/delegate.conf` with:
+Create `/etc/systemd/system/user@.service.d/delegate.conf` (requires `sudo`)
+with:
 
 ```ini
 [Service]
 Delegate=cpu cpuset io memory pids
 ```
+
+After creating the file, reload the systemd configuration:
+
+```bash
+sudo systemctl daemon-reload
+```
+
+**Note:** You must log out and log back in (or reboot) for these changes to take
+effect for your user session.
 
 ## Step 2: Enable Podman socket
 
@@ -47,7 +58,9 @@ systemctl --user enable --now podman.socket
 
 ## Step 3: Export socket locations
 
-Set environment variables to direct k3d to the Podman socket.
+Set environment variables to direct k3d to the Podman socket. `DOCKER_HOST` is
+used by the k3d CLI to talk to the Podman socket, while `DOCKER_SOCK` is often
+used by scripts or tools that expect a direct path to the socket file.
 
 Export:
 
@@ -77,3 +90,32 @@ Verify the cluster:
 k3d cluster list
 kubectl get nodes
 ```
+
+## Troubleshooting
+
+### AppArmor and User Namespaces
+
+Ubuntu 24.04 restricts unprivileged user namespaces, which can prevent rootless
+Podman from creating containers. If you encounter errors related to user
+namespaces, you may need to adjust the AppArmor configuration.
+
+A temporary workaround is to disable the restriction:
+
+```bash
+sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+```
+
+For a permanent fix, ensure you are using a version of Podman that includes the
+necessary AppArmor profiles, or create a profile that allows `userns`.
+
+### Cgroup Version
+
+Ensure your system is using cgroup v2, which is the default on Ubuntu 24.04. You
+can verify this with:
+
+```bash
+podman info | grep "cgroup version"
+```
+
+It should output `cgroup version: v2`.
+
