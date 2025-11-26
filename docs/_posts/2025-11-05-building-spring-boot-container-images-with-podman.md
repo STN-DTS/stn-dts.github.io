@@ -35,9 +35,9 @@ Podman socket on the host.
   <groupId>org.springframework.boot</groupId>
   <artifactId>spring-boot-maven-plugin</artifactId>
   <configuration>
-    <image>
+    <docker>
       <bindHostToBuilder>true</bindHostToBuilder>
-    </image>
+    </docker>
   </configuration>
 </plugin>
 ```
@@ -151,9 +151,11 @@ version. You can customize this in your configuration:
 
 ```xml
 <configuration>
+  <docker>
+    <bindHostToBuilder>true</bindHostToBuilder>
+  </docker>
   <image>
     <name>my-registry.com/my-org/${project.artifactId}:${project.version}</name>
-    <bindHostToBuilder>true</bindHostToBuilder>
   </image>
 </configuration>
 ```
@@ -162,10 +164,10 @@ version. You can customize this in your configuration:
 
 ```groovy
 bootBuildImage {
-    imageName = "my-registry.com/my-org/${project.name}:${project.version}"
     docker {
         bindHostToBuilder = true
     }
+    imageName = "my-registry.com/my-org/${project.name}:${project.version}"
 }
 ```
 
