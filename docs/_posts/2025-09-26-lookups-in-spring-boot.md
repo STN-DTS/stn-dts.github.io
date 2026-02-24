@@ -33,12 +33,17 @@ Let's walk through the implementation, from the database to the service layer.
 
 Our lookup tables are simple. For example, a `PROFILE_STATUS` table might look like this:
 
+<div style="overflow-x: auto;" markdown="1">
+
+
 | ID  | CODE       | NAME_EN    | NAME_FR    |
 | --- | ---------- | ---------- | ---------- |
 | 1   | APPROVED   | Approved   | Approuvé   |
 | 2   | PENDING    | Pending    | En attente |
 | 3   | INCOMPLETE | Incomplete | Incomplet  |
 | 4   | ARCHIVED   | Archived   | Archivé    |
+
+</div>
 
 We represent this with a JPA entity. We can use a base class like
 `AbstractCodeEntity` to hold common fields.

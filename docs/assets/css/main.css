@@ -75,6 +75,12 @@ img {
   border-radius: var(--radius);
 }
 
+ol,
+ul {
+  margin-bottom: var(--spacing-sm);
+  margin-left: var(--spacing-md);
+}
+
 /* Layout */
 .container {
   max-width: var(--max-width);
@@ -201,7 +207,6 @@ p {
 /* Post Content */
 .post-header {
   margin-bottom: var(--spacing-lg);
-  text-align: center;
 }
 
 .post-title {
@@ -249,6 +254,40 @@ p {
   position: relative;
   scroll-margin-top: 90px;
   /* Account for header height + padding */
+}
+
+/* Tables: clean, minimal blog styling */
+.post-content {
+  -webkit-overflow-scrolling: touch;
+}
+
+.post-content table {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-collapse: collapse;
+  margin: var(--spacing-md) 0;
+}
+
+.post-content th,
+.post-content td {
+  padding: 0.35rem;
+  border: 1px solid rgba(0,0,0,0.08);
+  text-align: left;
+}
+
+.post-content thead th {
+  background: var(--color-code-bg);
+  font-weight: 700;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+}
+
+.post-content tr:nth-child(even) td {
+  background-color: rgba(0,0,0,0.03);
+}
+
+.post-content table {
+  min-width: 60%;
 }
 
 /* Code Blocks */
