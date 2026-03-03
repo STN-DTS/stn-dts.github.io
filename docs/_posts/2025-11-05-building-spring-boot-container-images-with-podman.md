@@ -136,7 +136,7 @@ Podman works best with the `overlay` storage driver. If your builds are
 exceptionally slow, check your storage driver:
 
 ```bash
-podman info --format '{{.Store.GraphDriverName}}'
+podman info --format '{% raw %}{{.Store.GraphDriverName}}{% endraw %}'
 ```
 
 If it returns `vfs`, you should configure `fuse-overlayfs` for better
