@@ -14,8 +14,8 @@ categories:
 # Using k3d on Ubuntu 24.04 with rootless Podman
 
 k3d creates Kubernetes clusters using k3s in Docker containers. To use k3d with
-rootless Podman on Ubuntu 24.04, configure cgroup delegation and enable the
-Podman socket for Docker API compatibility.
+rootless Podman on Ubuntu 24.04, you must configure cgroup delegation, increase
+system file watcher limits, and enable the Podman socket for Docker API compatibility.
 
 ## Prerequisites
 
@@ -72,14 +72,41 @@ export DOCKER_SOCK=$XDG_RUNTIME_DIR/podman/podman.sock
 To set these variables automatically at login, add the export commands to your
 shell profile (e.g., `~/.bashrc` or `~/.zshrc`).
 
-## Step 4: Create the k3d cluster
+## Step 4: Increase `inotify` resource limits
 
-Create the cluster with user namespace support for rootless Podman.
+When running multiple Kubernetes nodes (like a server and multiple agents) as
+rootless containers on a single host, they aggressively consume the kernel's file
+watcher (`inotify`) resources. 
+
+If you leave the default limits in place, the Kubelet's `cAdvisor` will quickly
+hit a ceiling and silently crash (`inotify_init: too many open files`). Because 
+the agents fail to initialize, `k3d` will hang indefinitely while waiting for the 
+cluster to report a "Ready" status.
+
+To fix this permanently, increase the limits by creating `/etc/sysctl.d/99-k3d.conf`
+(requires `sudo`):
+
+```ini
+fs.inotify.max_user_instances=8192
+fs.inotify.max_user_watches=524288
+```
+
+Apply the new limits immediately without rebooting:
+
+```bash
+sudo sysctl -p /etc/sysctl.d/99-k3d.conf
+```
+
+## Step 5: Create the k3d cluster
+
+Create the cluster with user namespace support for rootless Podman. The feature 
+gates ensure the Kubelet handles the User Namespace environment correctly without 
+crashing due to missing host-level privileges.
 
 Run:
 
 ```bash
-k3d cluster create --k3s-arg '--kubelet-arg=feature-gates=KubeletInUserNamespace=true@server:*'
+k3d cluster create --servers 1 --agents 3 --k3s-arg '--kubelet-arg=feature-gates=KubeletInUserNamespace=true@server:*' --k3s-arg '--kubelet-arg=feature-gates=KubeletInUserNamespace=true@agent:*'
 ```
 
 ## Verification
@@ -118,4 +145,3 @@ podman info | grep "cgroup version"
 ```
 
 It should output `cgroup version: v2`.
-
