@@ -6,30 +6,31 @@ date: 2025-09-05
 categories: react-router browser
 ---
 
-If you've built a complex web app, you've likely seen it: a user has multiple tabs open, and suddenly data from one tab
-overwrites data in another. This frustrating issue, known as data clobbering, can corrupt user data and wreck the user
-experience.
+Here's a bug you've probably run into, even if you didn't know what to call it. A user opens your app in two tabs. They
+start filling out a form in the first tab, switch to the second tab to look something up, and come back to find the first
+tab showing data from the second one. Their work is gone.
 
-This is where browser tab isolation comes in. This post introduces a powerful technique for isolating tabs in React applications
-using a custom hook called `useTabId`. We'll break down how it works and how you can implement it in your own projects.
+We call this *data clobbering*: one tab writes over the other tab's data. In this post I'll walk through how we fixed it
+with a small React hook called `useTabId`.
 
-## The Problem: Data Clobbering in a Multi-Tab World
+## Why it happens
 
-Imagine a user filling out a long form. They open a new tab to check some information, and when they return, their form data is
-gone, replaced by the state of the other tab. This happens when an application uses a shared storage mechanism, like a
-server-side session or `localStorage`, without distinguishing between tabs. The application treats all tabs as one, leading to
-data collisions.
+Most apps keep some state outside the page itself. It might live in a server-side session, in a cookie, or in
+`localStorage`. The catch is that all of those are shared by every tab in the browser. If both tabs save their form data
+under the same key, whichever tab saves last wins.
 
-## The Solution: A Unique Identifier for Each Tab
+The app has no way to tell the two tabs apart, so it treats them like one.
 
-To fix this, each browser tab needs a unique identifier. The `useTabId` hook does just that. It generates a unique, persistent
-ID for each tab and stores it in `sessionStorage`. Since `sessionStorage` is scoped to a single tab, each tab gets its own
-isolated data context.
+## The fix: give each tab its own ID
 
-### How it Works: A Look Under the Hood
+If every tab has its own ID, we can include that ID in our storage keys, and the tabs stop stepping on each other.
 
-The `useTabId` hook uses React's `useSyncExternalStore` to keep the tab ID in sync between `sessionStorage` and your component's
-state. Here's a look at the implementation:
+The browser already gives us a good place to keep that ID: `sessionStorage`. Unlike `localStorage`, each tab gets its own
+copy of `sessionStorage`. It also survives a page reload, so the ID stays the same for as long as the tab is open.
+
+## The hook
+
+Here's the core of `useTabId`:
 
 ```tsx
 import { useEffect, useSyncExternalStore } from 'react';
@@ -77,17 +78,27 @@ export function useTabId(options?: Options): string | undefined {
 }
 ```
 
-The hook's logic is straightforward:
+There isn't much to it. Taking it one piece at a time:
 
-1.  **Generate a unique ID:** `generateRandomId` creates a random, human-readable ID.
-2.  **Store the ID in `sessionStorage`:** `getSnapshot` gets the current tab ID from `sessionStorage` or creates a new one. This
-    makes the ID persist through page reloads in the same tab.
-3.  **Subscribe to changes:** `subscribe` listens for changes to the tab ID in `sessionStorage`. If the ID changes,
-    `useSyncExternalStore` triggers a re-render, ensuring the component always has the latest ID.
+- `generateRandomId` makes a short ID like `kq-4821`. It doesn't need to be globally unique, just different enough that
+  two tabs open at the same time won't get the same one. Keeping it short and readable also makes it easier to spot in
+  logs and URLs when you're debugging.
+- `getSnapshot` looks for an ID in `sessionStorage`. If there isn't one yet, it makes one and saves it. Either way, you
+  get the same ID back every time you call it in that tab.
+- `subscribe` listens for the browser's `storage` event so that if the stored ID ever changes, React knows to re-render.
 
-### Putting it all Together: Using the `useTabId` Hook
+These three pieces are wired together with `useSyncExternalStore`. That's React's built-in hook for reading a value that
+lives outside of React (here, `sessionStorage`) and keeping your component up to date with it. You give it a function to
+subscribe to changes, a function to read the current value, and a function to use during server rendering.
 
-Here's how to use the `useTabId` hook in a React component:
+That last one matters. When the page is rendered on the server there's no `window` and no `sessionStorage`, so the hook
+can't read the ID from there. Instead it falls back to the `tid` value in the URL's query string (`?tid=kq-4821`). The
+parts of the hook I left out above handle keeping that query parameter in sync with the stored ID, so the server and the
+browser end up agreeing on which tab is which.
+
+## Using it
+
+In a component, it looks like this:
 
 ```tsx
 import { useTabId } from '~/hooks/use-tab-id';
@@ -102,18 +113,22 @@ function MyComponent() {
 }
 ```
 
-By including the `tabId` in your data keys, you give each tab its own storage space. This prevents data clobbering and ensures a
-consistent user experience.
+The only change from what you'd normally write is that the tab ID is now part of the key. Tab A saves to
+`my-app-data-kq-4821`, tab B saves to `my-app-data-xd-0937`, and neither one can overwrite the other.
 
-## Beyond the Basics: URL Synchronization and Best Practices
+## A few tips
 
-A few best practices for using `useTabId`:
+- **Use it everywhere you store per-tab data.** If one component uses the tab ID and another doesn't, you've still got
+  the bug, it's just harder to find.
+- **Don't build more than you need.** For most apps, an ID in `sessionStorage` is enough. You probably don't need to
+  coordinate between tabs or track which tabs are open.
+- **Test it with real tabs.** Open the app in two tabs, do different things in each, and make sure nothing leaks
+  between them. Also try reloading a tab to check that it keeps its ID.
+- **Watch out for "Duplicate tab".** Most browsers copy `sessionStorage` when you duplicate a tab, so the new tab
+  starts out with the same ID as the original. Keep that in mind if it matters for your app.
 
-*   **Be consistent:** Use the `useTabId` hook in all components that handle tab-specific data.
-*   **Keep it simple:** The `useTabId` hook is a simple solution. Don't over-engineer your tab isolation logic.
-*   **Test thoroughly:** As with any critical feature, make sure to test your implementation to ensure it works as expected.
+## Wrapping up
 
-## Conclusion
-
-Browser tab isolation is essential for building robust web applications. With a custom hook like `useTabId`, you can easily
-isolate data between tabs, prevent data clobbering, and create a better user experience. Give it a try in your next project!
+Multi-tab bugs are annoying because they're hard to reproduce and they make users lose work. Giving each tab its own ID
+is a small change that fixes a whole class of them. If your app stores anything a user would be upset to lose, it's worth
+adding.
