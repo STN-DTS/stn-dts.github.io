@@ -1,29 +1,59 @@
 ---
 layout: default
 ---
-
+{%- assign featured = site.posts.first -%}
 <div class="home">
-  {%- if page.title -%}
-  <h1 class="page-heading">{{ page.title }}</h1>
+  <section class="hero" aria-labelledby="hero-title">
+    <p class="prompt">$ cat README.md</p>
+    <h1 class="hero-title" id="hero-title">Notes from the build pipeline<span class="accent">.</span></h1>
+    <p class="hero-lede">{{ site.title | escape }} writes up what works (and what didn't) while modernizing product
+      delivery across the Government of Canada: Spring Boot, React Router, Entra ID, Podman and CI/CD.</p>
+    {{ content }}
+  </section>
+
+  {%- if featured -%}
+  <section class="window" aria-labelledby="featured-title">
+    <div class="window-bar">
+      <span class="window-dot" aria-hidden="true"></span>
+      <span class="window-dot" aria-hidden="true"></span>
+      <span class="window-dot" aria-hidden="true"></span>
+      <span class="window-title">latest — {{ featured.date | date: "%Y-%m-%d" }}</span>
+    </div>
+    <div class="window-body">
+      {%- if featured.categories.size > 0 -%}
+      <ul class="tag-list" aria-label="Topics">
+        {%- for c in featured.categories -%}
+        <li><a href="{{ '/' | relative_url }}?tag={{ c | url_encode }}">#{{ c }}</a></li>
+        {%- endfor -%}
+      </ul>
+      {%- endif -%}
+      <h2 class="featured-title" id="featured-title">
+        <a href="{{ featured.url | relative_url }}">{{ featured.title | escape }}</a>
+      </h2>
+      <p class="featured-excerpt">{{ featured.excerpt | strip_html | normalize_whitespace | truncatewords: 50 }}</p>
+      <a class="button" href="{{ featured.url | relative_url }}" aria-label="Read {{ featured.title | escape }}">read --full →</a>
+    </div>
+  </section>
   {%- endif -%}
 
-  {{ content }}
-
-  {% if site.posts.size > 0 %}
-  <ul class="post-list">
-    {% for post in site.posts %}
-    <li class="post-item">
-      <span class="post-meta">{{ post.date | date: "%b %-d, %Y" }}</span>
-      <h3>
-        <a class="post-link" href="{{ post.url | relative_url }}">
-          {{ post.title | escape }}
+  <section class="log" aria-labelledby="log-title">
+    <div class="log-head">
+      <h2 class="prompt" id="log-title">$ ls posts/ --sort=date</h2>
+      <div class="filters" role="group" aria-label="Filter by topic" data-filters hidden></div>
+    </div>
+    <ol class="post-log" data-post-log>
+      {%- for post in site.posts -%}
+      <li data-tags="{{ post.categories | join: ' ' | escape }}" {% if forloop.first %}class="is-featured"{% endif %}>
+        <a href="{{ post.url | relative_url }}">
+          <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%Y-%m-%d" }}</time>
+          <span class="post-log-title">{{ post.title | escape }}</span>
+          <span class="post-log-tags">
+            {%- for c in post.categories limit: 3 -%}<span>#{{ c }}</span>{%- endfor -%}
+          </span>
         </a>
-      </h3>
-      {%- if site.show_excerpts -%}
-      <div class="post-excerpt">{{ post.excerpt }}</div>
-      {%- endif -%}
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
+      </li>
+      {%- endfor -%}
+    </ol>
+    <p class="post-log-empty" data-post-log-empty hidden>no posts match that tag.</p>
+  </section>
 </div>

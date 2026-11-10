@@ -1,24 +1,58 @@
 ---
 layout: default
 ---
+<div class="read-progress" aria-hidden="true"><div class="read-progress-bar" data-read-progress></div></div>
+
 <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
     <header class="post-header">
+        {%- if page.categories.size > 0 -%}
+        <ul class="tag-list" aria-label="Topics">
+            {%- for c in page.categories -%}
+            <li><a href="{{ '/' | relative_url }}?tag={{ c | url_encode }}">#{{ c }}</a></li>
+            {%- endfor -%}
+        </ul>
+        {%- endif -%}
         <h1 class="post-title p-name" itemprop="name headline">{{ page.title | escape }}</h1>
         <p class="post-meta">
-            <time class="dt-published" datetime="{{ page.date | date_to_xmlschema }}" itemprop="datePublished">
-                {%- assign date_format = site.minima.date_format | default: "%b %-d, %Y" -%}
-                {{ page.date | date: date_format }}
-            </time>
             {%- if page.author -%}
-            • <span itemprop="author" itemscope itemtype="http://schema.org/Person"><span class="p-author h-card"
-                    itemprop="name">{{ page.author }}</span></span>
-            {%- endif -%}
+            <span itemprop="author" itemscope itemtype="http://schema.org/Person"><span class="p-author h-card"
+                    itemprop="name">{{ page.author }}</span></span> ·
+            {% endif -%}
+            <time class="dt-published" datetime="{{ page.date | date_to_xmlschema }}" itemprop="datePublished">
+                {{- page.date | date: "%Y-%m-%d" -}}
+            </time>
         </p>
     </header>
 
-    <div class="post-content e-content" itemprop="articleBody">
-        {{ content }}
+    <div class="post-layout" data-post-layout>
+        <div class="post-content e-content" itemprop="articleBody" data-post-content>
+            {{ content }}
+        </div>
+        <nav class="toc" aria-labelledby="toc-title" data-toc hidden>
+            <h2 class="toc-title" id="toc-title">$ grep '^##' post.md</h2>
+            <ol data-toc-list></ol>
+        </nav>
     </div>
 
     <a class="u-url" href="{{ page.url | relative_url }}" hidden></a>
 </article>
+
+<nav class="post-nav" aria-label="More posts">
+    {%- if page.previous -%}
+    <a href="{{ page.previous.url | relative_url }}" rel="prev">
+        <span class="post-nav-label">← older</span>
+        <span>{{ page.previous.title | escape }}</span>
+    </a>
+    {%- endif -%}
+    {%- if page.next -%}
+    <a class="post-nav-next" href="{{ page.next.url | relative_url }}" rel="next">
+        <span class="post-nav-label">newer →</span>
+        <span>{{ page.next.title | escape }}</span>
+    </a>
+    {%- else -%}
+    <a class="post-nav-next" href="{{ '/' | relative_url }}">
+        <span class="post-nav-label">all posts →</span>
+        <span>Back to the index</span>
+    </a>
+    {%- endif -%}
+</nav>

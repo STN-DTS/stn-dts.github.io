@@ -1,23 +1,43 @@
+<a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header">
-  <a class="site-title" href="{{ '/' | relative_url }}" title="{{ site.title | escape }}">
-    <span class="site-title-full">{{ site.title | escape }}</span>
-    <span class="site-title-short">DTS</span>
-  </a>
-  <nav class="site-nav">
-    <a href="{{ '/' | relative_url }}">Home</a>
-    <a href="{{ '/about/' | relative_url }}">About</a>
-    <div class="search-container">
-      <button id="search-toggle" class="search-toggle" aria-label="Toggle search">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+  <div class="wrap header-inner">
+    <a class="site-title" href="{{ '/' | relative_url }}" title="{{ site.title | escape }}">
+      <span class="accent">~/</span>dts
+      {%- if page.layout == 'post' -%}
+      <span class="site-path">/posts/{{ page.slug }}</span>
+      {%- else -%}
+      <span class="cursor" aria-hidden="true">_</span>
+      {%- endif -%}
+      <span class="visually-hidden">{{ site.title | escape }}</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="{{ '/' | relative_url }}" {% if page.url == '/' %}aria-current="page"{% endif %}>posts</a>
+      <a href="{{ '/about/' | relative_url }}" {% if page.url == '/about/' %}aria-current="page"{% endif %}>about</a>
+      <a href="{{ '/feed.xml' | relative_url }}">rss</a>
+      <button type="button" class="search-button" data-search-open aria-haspopup="dialog" aria-label="Search posts">
+        <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
         </svg>
+        <span class="search-label">Search posts…</span>
+        <kbd>Ctrl K</kbd>
       </button>
-      <div class="search-input-wrapper">
-        <input type="text" id="search-input" placeholder="Search...">
-        <div id="search-results" class="search-results"></div>
-      </div>
-    </div>
-  </nav>
+    </nav>
+  </div>
 </header>
+
+<dialog class="search-dialog" id="search-dialog" aria-label="Search posts">
+  <label class="search-field">
+    <span aria-hidden="true">&gt;</span>
+    <span class="visually-hidden">Search posts</span>
+    <input type="search" id="search-input" placeholder="grep posts…" autocomplete="off" spellcheck="false"
+      aria-controls="search-results">
+    <kbd>Esc</kbd>
+  </label>
+  <p class="search-status" id="search-status" role="status" aria-live="polite"></p>
+  <ul class="search-results" id="search-results"></ul>
+  <div class="search-footer" aria-hidden="true">
+    <span>↑↓ move</span><span>↵ open</span><span>esc close</span>
+  </div>
+</dialog>
