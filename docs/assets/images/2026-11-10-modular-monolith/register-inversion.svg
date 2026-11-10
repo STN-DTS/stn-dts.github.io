@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="498" viewBox="0 0 800 498" role="img" aria-labelledby="t d">
+  <title id="t">Dependency inversion with declaration merging</title>
+  <desc id="d">The kernel declares an empty Register interface and types run() with whatever Register holds. The application's register.ts imports the kernel and fills Register in with the real services, route table and translations. The kernel never imports the application. Every module is typechecked in the application's program, so an effect needing a missing service, a link to a page that does not exist, or a missing translation key is a type error.</desc>
+  <style>
+    .halo { paint-order: stroke; stroke: #12171e; stroke-width: 5px; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161b22"/>
+      <stop offset="1" stop-color="#10151c"/>
+    </linearGradient>
+    <radialGradient id="spot" cx="0.5" cy="0" r="0.9">
+      <stop offset="0" stop-color="#f5c062" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#f5c062" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="#2d3644" fill-opacity="0.55"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feFlood flood-color="#f5c062" flood-opacity="0.28"/>
+      <feComposite in2="blur" operator="in" result="tint"/>
+      <feMerge><feMergeNode in="tint"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6e7681"/>
+    </marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f5c062"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f85149"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="799" height="497" rx="12" fill="url(#bg)" stroke="#2d3644"/>
+  <rect x="0.5" y="0.5" width="799" height="497" rx="12" fill="url(#dots)"/>
+  <rect x="0.5" y="0.5" width="799" height="497" rx="12" fill="url(#spot)"/>
+  <path d="M0.5,36 H799.5" stroke="#2d3644"/>
+  <path d="M12.5,0.5 H787.5 A12,12 0 0 1 799.5,12.5 V36 H0.5 V12.5 A12,12 0 0 1 12.5,0.5 Z" fill="#0d1117" fill-opacity="0.55"/>
+  <circle cx="22" cy="18" r="5" fill="#f85149" fill-opacity="0.85"/>
+  <circle cx="40" cy="18" r="5" fill="#f5c062" fill-opacity="0.85"/>
+  <circle cx="58" cy="18" r="5" fill="#3fb950" fill-opacity="0.85"/>
+  <text x="400.0" y="22" font-size="11" fill="#8b96a5" text-anchor="middle" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">~/dts/diagrams/<tspan fill="#d0d7de">register-inversion.svg</tspan></text>
+  <text x="24" y="66" font-size="15" font-weight="700" fill="#e6edf3" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace"><tspan fill="#f5c062">## </tspan>Dependency inversion with declaration merging</text>
+  <g transform="translate(0 56)">
+    <rect x="24" y="32" width="340" height="206" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="24" y="32" width="340" height="206" rx="10" fill="#8b96a5" fill-opacity="0.05" stroke="#8b96a5" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="40" y="56" font-size="12.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">packages/kernel</text>
+    <text x="348" y="56" font-size="11" fill="#8b96a5" text-anchor="end" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">bridge.server.ts</text>
+    <text x="40" y="82" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">export </tspan><tspan fill="#ff7b72">interface </tspan><tspan fill="#ffa657">Register</tspan><tspan fill="#e6edf3"> {}</tspan></text>
+    <text x="40" y="118" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">type </tspan><tspan fill="#ffa657">BridgeServices</tspan><tspan fill="#e6edf3"> =</tspan></text>
+    <text x="40" y="136" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ffa657">  Register</tspan><tspan fill="#ff7b72"> extends </tspan><tspan fill="#e6edf3">{ services: </tspan><tspan fill="#ff7b72">infer </tspan><tspan fill="#ffa657">S</tspan><tspan fill="#e6edf3"> }</tspan></text>
+    <text x="40" y="154" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">    ? </tspan><tspan fill="#ffa657">S</tspan><tspan fill="#ff7b72"> | </tspan><tspan fill="#ffa657">CurrentRequest</tspan><tspan fill="#ff7b72"> | </tspan><tspan fill="#ffa657">CurrentUser</tspan></text>
+    <text x="40" y="172" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">    : </tspan><tspan fill="#ffa657">any</tspan></text>
+    <text x="40" y="208" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#d2a8ff">run</tspan><tspan fill="#e6edf3">(ctx, </tspan><tspan fill="#ffa657">Effect</tspan><tspan fill="#e6edf3">&lt;A, E, </tspan><tspan fill="#ffa657">BridgeServices</tspan><tspan fill="#e6edf3">&gt;, …)</tspan></text>
+    <rect x="436" y="32" width="340" height="206" rx="10" fill="#0d1117" filter="url(#glow)"/><rect x="436" y="32" width="340" height="206" rx="10" fill="#f5c062" fill-opacity="0.06" stroke="#f5c062" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="452" y="56" font-size="12.5" fill="#f5c062" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">apps/web</text>
+    <text x="760" y="56" font-size="11" fill="#8b96a5" text-anchor="end" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">app/register.ts</text>
+    <text x="452" y="82" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">declare </tspan><tspan fill="#ff7b72">module </tspan><tspan fill="#a5d6ff">'@app/kernel/bridge.server'</tspan><tspan fill="#e6edf3"> {</tspan></text>
+    <text x="452" y="100" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">  interface </tspan><tspan fill="#ffa657">Register</tspan><tspan fill="#e6edf3"> {</tspan></text>
+    <text x="452" y="118" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">    readonly </tspan><tspan fill="#e6edf3">services:</tspan></text>
+    <text x="452" y="136" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">      | </tspan><tspan fill="#ffa657">Layer</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#ffa657">Success</tspan><tspan fill="#e6edf3">&lt;</tspan><tspan fill="#ff7b72">typeof </tspan><tspan fill="#ffa657">AppLayer</tspan><tspan fill="#e6edf3">&gt;</tspan></text>
+    <text x="452" y="154" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ff7b72">      | </tspan><tspan fill="#ffa657">SessionServices</tspan><tspan fill="#e6edf3">;</tspan></text>
+    <text x="452" y="172" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#e6edf3">  }</tspan></text>
+    <text x="452" y="190" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#e6edf3">}</tspan></text>
+    <text x="452" y="208" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#8b949e">// …and the same for routing and i18next</tspan></text>
+    <line x1="434" y1="92" x2="366" y2="92" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="400" y="84" font-size="11" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">imports</text>
+    <line x1="434" y1="144" x2="366" y2="144" stroke="#f5c062" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#aa)"/>
+    <text x="400" y="130" font-size="11" fill="#f5c062" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">fills in</text>
+    <text x="400" y="162" font-size="11" fill="#f5c062" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">Register</text>
+    <line x1="366" y1="206" x2="434" y2="206" stroke="#f85149" stroke-width="1.5" stroke-dasharray="2 3" marker-end="url(#ar)"/>
+    <text x="400" y="211" font-size="16" fill="#ff7b72" text-anchor="middle" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" class="halo">✗</text>
+    <text x="400" y="228" font-size="11" fill="#ff7b72" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">no import</text>
+    <rect x="100" y="286" width="600" height="140" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="100" y="286" width="600" height="140" rx="10" fill="#58a6ff" fill-opacity="0.06" stroke="#58a6ff" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="116" y="310" font-size="12" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">every module, typechecked in the application's one program</text>
+    <text x="116" y="336" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#d2a8ff">run</tspan><tspan fill="#e6edf3">(context, </tspan><tspan fill="#ffa657">SearchJobs</tspan><tspan fill="#e6edf3">(…), …)</tspan></text>
+    <text x="684" y="336" font-size="11" fill="#56d364" text-anchor="end" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">✓ every service is provided</text>
+    <text x="116" y="358" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#d2a8ff">run</tspan><tspan fill="#e6edf3">(context, </tspan><tspan fill="#ffa657">NeedsAServiceNobodyProvides</tspan><tspan fill="#e6edf3">, …)</tspan></text>
+    <text x="684" y="358" font-size="11" fill="#ff7b72" text-anchor="end" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">✗ type error</text>
+    <text x="116" y="380" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#e6edf3">routing</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">getPath</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#a5d6ff">'@app/jobs/routes/nope.tsx'</tspan><tspan fill="#e6edf3">, </tspan><tspan fill="#a5d6ff">'en'</tspan><tspan fill="#e6edf3">)</tspan></text>
+    <text x="684" y="380" font-size="11" fill="#ff7b72" text-anchor="end" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">✗ type error</text>
+    <text x="116" y="402" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#d2a8ff">t</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#a5d6ff">'jobs:no.such.key'</tspan><tspan fill="#e6edf3">)</tspan></text>
+    <text x="684" y="402" font-size="11" fill="#ff7b72" text-anchor="end" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">✗ type error</text>
+    <line x1="194" y1="284" x2="194" y2="240" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="202" y="266" font-size="11" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">imports</text>
+    <line x1="606" y1="240" x2="606" y2="284" stroke="#f5c062" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#aa)"/>
+    <text x="614" y="266" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">real types flow in</text>
+  </g>
+</svg>

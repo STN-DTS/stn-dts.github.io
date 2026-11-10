@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" role="img" aria-labelledby="t d">
+  <title id="t">Context map</title>
+  <desc id="d">The dashboard is a customer of profile, benefits and jobs and uses their published APIs in their own language. Jobs reaches profile and employment records through anti-corruption layers that translate into its own model. Profile also reads employment records. Each upstream module is an open host service: it publishes an api.ts.</desc>
+  <style>
+    .halo { paint-order: stroke; stroke: #12171e; stroke-width: 5px; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161b22"/>
+      <stop offset="1" stop-color="#10151c"/>
+    </linearGradient>
+    <radialGradient id="spot" cx="0.5" cy="0" r="0.9">
+      <stop offset="0" stop-color="#f5c062" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#f5c062" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="#2d3644" fill-opacity="0.55"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feFlood flood-color="#f5c062" flood-opacity="0.28"/>
+      <feComposite in2="blur" operator="in" result="tint"/>
+      <feMerge><feMergeNode in="tint"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6e7681"/>
+    </marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f5c062"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f85149"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="799" height="499" rx="12" fill="url(#bg)" stroke="#2d3644"/>
+  <rect x="0.5" y="0.5" width="799" height="499" rx="12" fill="url(#dots)"/>
+  <rect x="0.5" y="0.5" width="799" height="499" rx="12" fill="url(#spot)"/>
+  <path d="M0.5,36 H799.5" stroke="#2d3644"/>
+  <path d="M12.5,0.5 H787.5 A12,12 0 0 1 799.5,12.5 V36 H0.5 V12.5 A12,12 0 0 1 12.5,0.5 Z" fill="#0d1117" fill-opacity="0.55"/>
+  <circle cx="22" cy="18" r="5" fill="#f85149" fill-opacity="0.85"/>
+  <circle cx="40" cy="18" r="5" fill="#f5c062" fill-opacity="0.85"/>
+  <circle cx="58" cy="18" r="5" fill="#3fb950" fill-opacity="0.85"/>
+  <text x="400.0" y="22" font-size="11" fill="#8b96a5" text-anchor="middle" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">~/dts/diagrams/<tspan fill="#d0d7de">context-map.svg</tspan></text>
+  <text x="24" y="66" font-size="15" font-weight="700" fill="#e6edf3" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace"><tspan fill="#f5c062">## </tspan>Context map</text>
+  <text x="776" y="66" font-size="11.5" fill="#8b96a5" text-anchor="end" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">arrows point from consumer to supplier</text>
+  <g transform="translate(0 68)">
+    <line x1="330" y1="72" x2="160" y2="168" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="400" y1="72" x2="400" y2="168" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="470" y1="72" x2="640" y2="168" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="530" y1="198" x2="578" y2="198" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <path d="M448,254 V330 H578" fill="none" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="670" y1="228" x2="670" y2="298" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="232" y="116" font-size="12" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" class="halo">BenefitsFinder</text>
+    <text x="408" y="122" font-size="12" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" class="halo">JobMatches</text>
+    <text x="575" y="116" font-size="12" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" class="halo">CitizenDirectory</text>
+    <text x="552" y="242" font-size="10.5" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" class="halo">CitizenDirectory</text>
+    <text x="513" y="323" font-size="10.5" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" class="halo">EmploymentRecords</text>
+    <text x="680" y="268" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" class="halo">EmploymentRecords</text>
+    <rect x="250" y="12" width="300" height="60" rx="10" fill="#0d1117" filter="url(#glow)"/><rect x="250" y="12" width="300" height="60" rx="10" fill="#f5c062" fill-opacity="0.08" stroke="#f5c062" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="400" y="38" font-size="14" fill="#f5c062" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">dashboard</text>
+    <text x="400" y="58" font-size="10.5" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">customer · owns no data · composes the home page</text>
+    <rect x="40" y="168" width="190" height="60" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="40" y="168" width="190" height="60" rx="10" fill="#58a6ff" fill-opacity="0.09" stroke="#58a6ff" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="135.0" y="194" font-size="13.5" fill="#e6edf3" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">benefits</text>
+    <text x="135.0" y="214" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">program catalogue · eligibility</text>
+    <rect x="189.0" y="160.0" width="38.0" height="16" rx="8.0" fill="#0d1117"/><rect x="189.0" y="160.0" width="38.0" height="16" rx="8.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="208" y="171.42" font-size="9.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">OHS</text>
+    <rect x="305" y="168" width="190" height="60" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="305" y="168" width="190" height="60" rx="10" fill="#58a6ff" fill-opacity="0.09" stroke="#58a6ff" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="400.0" y="194" font-size="13.5" fill="#e6edf3" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">jobs</text>
+    <text x="400.0" y="214" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">postings · match score · shortlist</text>
+    <rect x="454.0" y="160.0" width="38.0" height="16" rx="8.0" fill="#0d1117"/><rect x="454.0" y="160.0" width="38.0" height="16" rx="8.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="473" y="171.42" font-size="9.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">OHS</text>
+    <rect x="580" y="168" width="180" height="60" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="580" y="168" width="180" height="60" rx="10" fill="#58a6ff" fill-opacity="0.09" stroke="#58a6ff" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="670.0" y="194" font-size="13.5" fill="#e6edf3" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">profile</text>
+    <text x="670.0" y="214" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">citizen record · consent</text>
+    <rect x="719.0" y="160.0" width="38.0" height="16" rx="8.0" fill="#0d1117"/><rect x="719.0" y="160.0" width="38.0" height="16" rx="8.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="738" y="171.42" font-size="9.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">OHS</text>
+    <rect x="580" y="300" width="180" height="60" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="580" y="300" width="180" height="60" rx="10" fill="#58a6ff" fill-opacity="0.09" stroke="#58a6ff" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="670.0" y="326" font-size="13.5" fill="#e6edf3" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">employment-records</text>
+    <text x="670.0" y="346" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">payroll events (headless)</text>
+    <rect x="719.0" y="292.0" width="38.0" height="16" rx="8.0" fill="#0d1117"/><rect x="719.0" y="292.0" width="38.0" height="16" rx="8.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="738" y="303.42" font-size="9.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">OHS</text>
+    <rect x="495" y="186" width="36" height="24" rx="5" fill="#0d1117"/><rect x="495" y="186" width="36" height="24" rx="5" fill="#f0883e" fill-opacity="0.18" stroke="#f0883e" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="513" y="202" font-size="10.5" fill="#ffa657" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">ACL</text>
+    <rect x="430" y="232" width="36" height="22" rx="5" fill="#0d1117"/><rect x="430" y="232" width="36" height="22" rx="5" fill="#f0883e" fill-opacity="0.18" stroke="#f0883e" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="448" y="247" font-size="10.5" fill="#ffa657" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">ACL</text>
+    <text x="40" y="274" font-size="12" fill="#8b96a5" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">The dashboard also reads payments,</text>
+    <text x="40" y="291" font-size="12" fill="#8b96a5" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">employment insurance, life events and</text>
+    <text x="40" y="308" font-size="12" fill="#8b96a5" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">employment records the same way.</text>
+    <line x1="24" y1="388" x2="60" y2="388" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="70" y="392" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">customer / supplier: uses the supplier's published API in the supplier's language</text>
+    <rect x="24" y="402" width="36" height="20" rx="4" fill="#0d1117"/><rect x="24" y="402" width="36" height="20" rx="4" fill="#f0883e" fill-opacity="0.18" stroke="#f0883e" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="42" y="416" font-size="10" fill="#ffa657" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">ACL</text>
+    <text x="70" y="416" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">anti-corruption layer: one adapter translates the supplier's model into the consumer's own port</text>
+    <rect x="581.0" y="376.0" width="38.0" height="16" rx="8.0" fill="#0d1117"/><rect x="581.0" y="376.0" width="38.0" height="16" rx="8.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="600" y="387.42" font-size="9.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">OHS</text>
+    <text x="626" y="388" font-size="10.5" fill="#a9b4c2" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">open host service (<tspan font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" fill="#56d364">api.ts</tspan>)</text>
+  </g>
+</svg>

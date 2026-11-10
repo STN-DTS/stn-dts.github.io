@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="444" viewBox="0 0 800 444" role="img" aria-labelledby="t d">
+  <title id="t">settle: one slow or failing module never blanks the page</title>
+  <desc id="d">The home page use case starts six parts concurrently. Each runs through settle with a 1.5 second timeout. Four finish and are ready. The claim part fails and the payments part runs past the timeout; both become unavailable and are logged. The page still renders, with those two cards showing an unavailable notice.</desc>
+  <style>
+    .halo { paint-order: stroke; stroke: #12171e; stroke-width: 5px; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161b22"/>
+      <stop offset="1" stop-color="#10151c"/>
+    </linearGradient>
+    <radialGradient id="spot" cx="0.5" cy="0" r="0.9">
+      <stop offset="0" stop-color="#f5c062" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#f5c062" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="#2d3644" fill-opacity="0.55"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feFlood flood-color="#f5c062" flood-opacity="0.28"/>
+      <feComposite in2="blur" operator="in" result="tint"/>
+      <feMerge><feMergeNode in="tint"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6e7681"/>
+    </marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f5c062"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f85149"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="799" height="443" rx="12" fill="url(#bg)" stroke="#2d3644"/>
+  <rect x="0.5" y="0.5" width="799" height="443" rx="12" fill="url(#dots)"/>
+  <rect x="0.5" y="0.5" width="799" height="443" rx="12" fill="url(#spot)"/>
+  <path d="M0.5,36 H799.5" stroke="#2d3644"/>
+  <path d="M12.5,0.5 H787.5 A12,12 0 0 1 799.5,12.5 V36 H0.5 V12.5 A12,12 0 0 1 12.5,0.5 Z" fill="#0d1117" fill-opacity="0.55"/>
+  <circle cx="22" cy="18" r="5" fill="#f85149" fill-opacity="0.85"/>
+  <circle cx="40" cy="18" r="5" fill="#f5c062" fill-opacity="0.85"/>
+  <circle cx="58" cy="18" r="5" fill="#3fb950" fill-opacity="0.85"/>
+  <text x="400.0" y="22" font-size="11" fill="#8b96a5" text-anchor="middle" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">~/dts/diagrams/<tspan fill="#d0d7de">settle-fanout.svg</tspan></text>
+  <text x="24" y="66" font-size="15" font-weight="700" fill="#e6edf3" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace"><tspan fill="#f5c062">## </tspan>settle: one slow or failing module never blanks the page</text>
+  <g transform="translate(0 44)">
+    <rect x="24" y="158" width="110" height="56" rx="8" fill="#0d1117" filter="url(#glow)"/><rect x="24" y="158" width="110" height="56" rx="8" fill="#f5c062" fill-opacity="0.08" stroke="#f5c062" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="79" y="182" font-size="12.5" fill="#f5c062" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">ViewHome</text>
+    <text x="46" y="200" font-size="10.5" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#ffa657">Effect</tspan><tspan fill="#e6edf3">.</tspan><tspan fill="#d2a8ff">all</tspan></text>
+    <path d="M134,186 C150,186 150,66 166,66" fill="none" stroke="#484f58" stroke-width="1.4"/>
+    <text x="172" y="70" font-size="12" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">claim status</text>
+    <rect x="300" y="57" width="50" height="18" rx="4" fill="#f85149" fill-opacity="0.35" stroke="#f85149"/>
+    <text x="358.4" y="71" font-size="11.5" fill="#ff7b72" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">✗ failed</text>
+    <rect x="588.0" y="56.0" width="80.0" height="20" rx="10.0" fill="#0d1117"/><rect x="588.0" y="56.0" width="80.0" height="20" rx="10.0" fill="#484f58" fill-opacity="0.14" stroke="#484f58" stroke-opacity="0.85"/>
+    <text x="628" y="69.78" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">unavailable</text>
+    <path d="M134,186 C150,186 150,106 166,106" fill="none" stroke="#484f58" stroke-width="1.4"/>
+    <text x="172" y="110" font-size="12" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">job applications</text>
+    <rect x="300" y="97" width="72" height="18" rx="4" fill="#3fb950" fill-opacity="0.35" stroke="#3fb950"/>
+    <rect x="588.0" y="96.0" width="80.0" height="20" rx="10.0" fill="#0d1117"/><rect x="588.0" y="96.0" width="80.0" height="20" rx="10.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="628" y="109.78" font-size="10.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">ready</text>
+    <path d="M134,186 C150,186 150,146 166,146" fill="none" stroke="#484f58" stroke-width="1.4"/>
+    <text x="172" y="150" font-size="12" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">payments</text>
+    <rect x="300" y="137" width="180" height="18" rx="4" fill="#8b96a5" fill-opacity="0.22" stroke="#8b96a5"/>
+    <rect x="480" y="137" width="40" height="18" fill="none" stroke="#484f58" stroke-dasharray="3 3"/>
+    <text x="526.0" y="150" font-size="11.5" fill="#ff7b72" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">timed out</text>
+    <rect x="588.0" y="136.0" width="80.0" height="20" rx="10.0" fill="#0d1117"/><rect x="588.0" y="136.0" width="80.0" height="20" rx="10.0" fill="#484f58" fill-opacity="0.14" stroke="#484f58" stroke-opacity="0.85"/>
+    <text x="628" y="149.78" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">unavailable</text>
+    <path d="M134,186 C150,186 150,186 166,186" fill="none" stroke="#484f58" stroke-width="1.4"/>
+    <text x="172" y="190" font-size="12" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">life events</text>
+    <rect x="300" y="177" width="96" height="18" rx="4" fill="#3fb950" fill-opacity="0.35" stroke="#3fb950"/>
+    <rect x="588.0" y="176.0" width="80.0" height="20" rx="10.0" fill="#0d1117"/><rect x="588.0" y="176.0" width="80.0" height="20" rx="10.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="628" y="189.78" font-size="10.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">ready</text>
+    <path d="M134,186 C150,186 150,226 166,226" fill="none" stroke="#484f58" stroke-width="1.4"/>
+    <text x="172" y="230" font-size="12" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">job matches</text>
+    <rect x="300" y="217" width="120" height="18" rx="4" fill="#3fb950" fill-opacity="0.35" stroke="#3fb950"/>
+    <rect x="588.0" y="216.0" width="80.0" height="20" rx="10.0" fill="#0d1117"/><rect x="588.0" y="216.0" width="80.0" height="20" rx="10.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="628" y="229.78" font-size="10.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">ready</text>
+    <path d="M134,186 C150,186 150,266 166,266" fill="none" stroke="#484f58" stroke-width="1.4"/>
+    <text x="172" y="270" font-size="12" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">what's new</text>
+    <rect x="300" y="257" width="36" height="18" rx="4" fill="#3fb950" fill-opacity="0.35" stroke="#3fb950"/>
+    <rect x="588.0" y="256.0" width="80.0" height="20" rx="10.0" fill="#0d1117"/><rect x="588.0" y="256.0" width="80.0" height="20" rx="10.0" fill="#3fb950" fill-opacity="0.14" stroke="#3fb950" stroke-opacity="0.85"/>
+    <text x="628" y="269.78" font-size="10.5" fill="#56d364" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">ready</text>
+    <line x1="480.0" y1="48" x2="480.0" y2="290" stroke="#f85149" stroke-width="1.4" stroke-dasharray="5 4"/>
+    <text x="480.0" y="42" font-size="11" fill="#ff7b72" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">1.5 s timeout</text>
+    <line x1="300" y1="296" x2="516.0" y2="296" stroke="#484f58" stroke-width="1"/>
+    <line x1="300" y1="292" x2="300" y2="300" stroke="#484f58" stroke-width="1"/>
+    <text x="300" y="314" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">0 s</text>
+    <line x1="360.0" y1="292" x2="360.0" y2="300" stroke="#484f58" stroke-width="1"/>
+    <text x="360.0" y="314" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">0.5 s</text>
+    <line x1="420" y1="292" x2="420" y2="300" stroke="#484f58" stroke-width="1"/>
+    <text x="420" y="314" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">1 s</text>
+    <line x1="480.0" y1="292" x2="480.0" y2="300" stroke="#484f58" stroke-width="1"/>
+    <text x="480.0" y="314" font-size="10.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">1.5 s</text>
+    <rect x="680" y="42" width="100" height="262" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="680" y="42" width="100" height="262" rx="8" fill="#8b96a5" fill-opacity="0.05" stroke="#8b96a5" stroke-opacity="0.9" stroke-width="1.4"/>
+    <path d="M688,42 H772 A8,8 0 0 1 780,50 V60 H680 V50 A8,8 0 0 1 688,42 Z" fill="#f5c062" fill-opacity="0.25"/>
+    <text x="730" y="322" font-size="11" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">the page renders</text>
+    <rect x="690" y="68" width="80" height="30" rx="4" fill="none" stroke="#484f58" stroke-dasharray="3 3"/>
+    <text x="730" y="87" font-size="9" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">unavailable</text>
+    <rect x="690" y="106" width="80" height="30" rx="4" fill="#58a6ff" fill-opacity="0.10" stroke="#58a6ff" stroke-opacity="0.7"/>
+    <rect x="696" y="113" width="16" height="16" rx="3" fill="#f5c062" fill-opacity="0.8"/>
+    <rect x="718" y="115" width="44" height="4" rx="2" fill="#a9b4c2"/><rect x="718" y="123" width="30" height="4" rx="2" fill="#484f58"/>
+    <rect x="690" y="144" width="80" height="30" rx="4" fill="none" stroke="#484f58" stroke-dasharray="3 3"/>
+    <text x="730" y="163" font-size="9" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">unavailable</text>
+    <rect x="690" y="182" width="80" height="30" rx="4" fill="#58a6ff" fill-opacity="0.10" stroke="#58a6ff" stroke-opacity="0.7"/>
+    <rect x="696" y="189" width="16" height="16" rx="3" fill="#f5c062" fill-opacity="0.8"/>
+    <rect x="718" y="191" width="44" height="4" rx="2" fill="#a9b4c2"/><rect x="718" y="199" width="30" height="4" rx="2" fill="#484f58"/>
+    <rect x="690" y="220" width="80" height="30" rx="4" fill="#58a6ff" fill-opacity="0.10" stroke="#58a6ff" stroke-opacity="0.7"/>
+    <rect x="696" y="227" width="16" height="16" rx="3" fill="#f5c062" fill-opacity="0.8"/>
+    <rect x="718" y="229" width="44" height="4" rx="2" fill="#a9b4c2"/><rect x="718" y="237" width="30" height="4" rx="2" fill="#484f58"/>
+    <rect x="690" y="258" width="80" height="30" rx="4" fill="#58a6ff" fill-opacity="0.10" stroke="#58a6ff" stroke-opacity="0.7"/>
+    <rect x="696" y="265" width="16" height="16" rx="3" fill="#f5c062" fill-opacity="0.8"/>
+    <rect x="718" y="267" width="44" height="4" rx="2" fill="#a9b4c2"/><rect x="718" y="275" width="30" height="4" rx="2" fill="#484f58"/>
+    <text x="24" y="358" font-size="11" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" xml:space="preserve"><tspan fill="#d2a8ff">settle</tspan><tspan fill="#e6edf3">(name, effect) = effect.</tspan><tspan fill="#d2a8ff">pipe</tspan><tspan fill="#e6edf3">(</tspan><tspan fill="#d2a8ff">timeout</tspan><tspan fill="#e6edf3">(1.5 s), </tspan><tspan fill="#d2a8ff">map</tspan><tspan fill="#e6edf3">(ready), </tspan><tspan fill="#d2a8ff">catchCause</tspan><tspan fill="#e6edf3">(log + unavailable))</tspan></text>
+    <text x="24" y="382" font-size="11" fill="#8b96a5" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">A failure, a defect or a timeout in one part becomes a value the page can render. The other parts are untouched.</text>
+  </g>
+</svg>
