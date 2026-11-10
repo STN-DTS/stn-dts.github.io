@@ -6,78 +6,54 @@ date: 2025-11-04
 categories: api rest json-patch
 ---
 
-## Introduction
+An HTTP `PATCH` request asks the server to change part of an object instead of replacing the whole thing. If your API
+accepts them, you need a predictable way to apply those partial updates without ending up with an object that breaks
+your rules (for example, a user with an empty email address).
 
-When you accept HTTP PATCH requests that update domain objects, you need a
-predictable, safe way to apply partial updates while keeping your invariants
-intact.
+Here's the approach we use. We take the patch document, apply it to a *copy* of the object, validate the copy, and only
+save it if it passes. The patch formats are the two standard ones: JSON Patch (RFC 6902), which is a list of operations
+like "replace this field" or "remove that one", and JSON Merge Patch (RFC 7396), which is a partial JSON object that
+gets merged into the original. Because we use existing implementations of both, we don't have to write our own patch
+logic, and all the validation stays in one place.
 
-This post presents a pragmatic approach: apply an RFC-compliant JSON Patch or
-JSON Merge Patch to a deep copy of the target object, validate the patched copy,
-and only persist the result if it passes validation. The approach is simple,
-standards-driven, and keeps validation logic in a single place.
+The full code is at the end of the post. The sections before it explain how it works, what to watch out for, and how to
+test it.
 
-Below I explain what the processor does, why this design is practical, important
-caveats to consider, testing suggestions, and low-risk improvements. The full
-implementation appears at the end of the post and is referenced from the
-sections below.
+## What the processor does
 
-## What the processor does (summary)
+`JsonPatchProcessor` takes a Java domain object and a patch document (either a `JsonPatch` or a `JsonMergePatch`). It
+then:
 
-- **Inputs:** a Java domain object instance and a patch document (`JsonPatch` or
-  `JsonMergePatch`).
-- **Behavior:** serialize the object to JSON, apply the patch to the JSON, then
-  deserialize the patched JSON back to a new object instance (a deep copy).
-- **Validation:** validate the patched object using Jakarta Bean Validation
-  (`Validator`).
-- **Outputs:** return the patched instance if validation succeeds; otherwise
-  throw `ConstraintViolationException`. JSON parsing or patch application errors
-  are surfaced as `JsonPatchException`.
+1. Serializes the object to JSON with Jackson's `ObjectMapper`.
+1. Applies the patch to that JSON using Jakarta JSON (`jakarta.json`).
+1. Deserializes the patched JSON back into a new instance of the same class.
+1. Validates the new instance with Jakarta Bean Validation (`Validator`).
 
-## Why this design works
+If validation passes, you get the patched object back. If it fails, the processor throws a
+`ConstraintViolationException`. If the JSON can't be parsed or the patch can't be applied, Jackson or Jakarta JSON
+errors get wrapped in a `JsonPatchException`, so your controllers only have to deal with one exception type for those.
 
-This approach balances simplicity, correctness, and standards compliance:
+## Why we like this design
 
-- **Deep copy safety:** serializing then deserializing produces a separate
-  object instance, avoiding accidental mutation of the original.
-- **Standards-first:** using RFC 6902 / 7396 implementations means you don't
-  reimplement patch semantics.
-- **Central validation:** running full-object validation on the patched copy
-  enforces invariants consistently and reduces duplication of validation logic
-  in controllers.
+Turning the object into JSON and back gives us a deep copy for free. The original object is never touched, so a bad
+patch can't leave it half-modified.
 
-The trade-offs with this approach are that the method performs serialization and
-deserialization for each patch operation, so benchmark if you expect very high
-throughput or very large payloads.
+Validating the whole patched object, not just the fields that changed, means every rule on the class gets checked the
+same way every time. Controllers don't need their own copies of the validation logic.
 
-## Implementation highlights
+The cost is that every patch goes through a full serialize and deserialize. That's fine for typical payloads, but if
+you expect very high throughput or very large objects, benchmark it first.
 
-The example `JsonPatchProcessor` included at the end of this post implements
-these behaviors:
+To sum up the error handling:
 
-- **Serialization:** uses Jackson's `ObjectMapper` to convert domain objects to
-  and from JSON.
-- **Patch application:** uses Jakarta JSON (`jakarta.json`) to read the
-  serialized JSON and apply `JsonPatch` (RFC 6902) or `JsonMergePatch` (RFC
-  7396).
-- **Validation:** runs Jakarta Bean Validation (`Validator`) against the patched
-  instance and throws `ConstraintViolationException` for any violations.
-- **Error handling:** wraps JSON or Jackson processing errors in a
-  `JsonPatchException` so controllers can translate them to suitable HTTP
-  responses.
-
-Error contract summary:
-
-- `ConstraintViolationException` — JSON parsing or patch application errors (map
-  to HTTP 400).
-- `JsonPatchException` — validation failures (map to HTTP 422 with field-level
-  messages).
+- `JsonPatchException` means the JSON couldn't be parsed or the patch couldn't be applied. Map it to HTTP 400.
+- `ConstraintViolationException` means the patched object failed validation. Map it to HTTP 422 with field-level
+  messages.
 
 ## Usage
 
-To use the processor from a Spring controller, inject the component and pass the
-existing domain object plus the parsed patch document. For example, a
-merge-patch endpoint might look like this:
+In a Spring controller, inject the processor and pass it the existing object along with the parsed patch document. A
+merge patch endpoint might look like this:
 
 ```java
 @PatchMapping(path = "/users/{id}", consumes = "application/merge-patch+json")
@@ -89,9 +65,7 @@ public ResponseEntity<User> patchUser(@PathVariable Long id, @RequestBody JsonMe
 }
 ```
 
-Example payloads (for reference):
-
-- JSON Merge Patch (RFC 7396):
+Here's what the two kinds of payload look like. A JSON Merge Patch (RFC 7396):
 
 ```json
 {
@@ -100,7 +74,7 @@ Example payloads (for reference):
 }
 ```
 
-- JSON Patch (RFC 6902):
+And a JSON Patch (RFC 6902):
 
 ```json
 [
@@ -110,48 +84,36 @@ Example payloads (for reference):
 ```
 
 
-## Important caveats and mapping errors
+## Things to watch out for
 
-- **Type and polymorphism:** the processor deserializes back to
-  `object.getClass()`. If your model relies on polymorphic deserialization
-  (`@JsonTypeInfo`) or uses abstract base types, test that subtype information
-  survives the round-trip. If it doesn't, preserve type metadata during
-  serialization or adjust the approach.
+The processor deserializes back into `object.getClass()`. If your model uses polymorphic types (for example
+`@JsonTypeInfo`, which tells Jackson which subclass to create) or abstract base classes, test that the subtype
+information survives the round trip. If it doesn't, you'll need to keep the type metadata during serialization or
+change the approach.
 
-- **Shared `ObjectMapper`:** the example builds its own `ObjectMapper`. If your
-  application configures a global mapper (date formats, modules, mixins),
-  consider injecting that mapper to ensure consistent behavior across the app.
+The example creates its own `ObjectMapper`. If your app already configures a shared one with date formats, modules, or
+mixins, inject that one instead so patching behaves the same as the rest of the app.
 
-- **Validation model:** this approach validates the whole object after applying
-  the patch. If you require partial/field-only validation, you'll need a
-  different validation strategy that checks only the changed fields.
+Validation always runs on the whole object after the patch is applied. If you need to validate only the fields that
+changed, you'll need a different strategy.
 
-- **Performance:** each patch performs serialization, patching, and
-  deserialization. For large objects or high throughput, consider applying
-  patches to Jackson `JsonNode` trees and mapping to domain objects only when
-  necessary.
+Every patch does a serialize, a patch, and a deserialize. For large objects or high throughput, consider applying
+patches to Jackson `JsonNode` trees and only mapping to domain objects when you need to.
 
-Error mapping recommendation:
+For error responses, use a `@ControllerAdvice` to turn `ConstraintViolationException` into an HTTP 422 (unprocessable
+content) with a structured list of field errors. Turn `JsonPatchException` into an HTTP 400 with a clear message about
+the JSON or patch problem, without leaking sensitive details.
 
-- Use a `@ControllerAdvice` to convert `ConstraintViolationException` to HTTP
-  422 (unprocessable content) with a structured list of field errors.
-- Convert `JsonPatchException` to HTTP 400 with a clear, non-sensitive message
-  describing the JSON/patch problem.
+## Testing
 
-## Tests and low-risk improvements
+These are the tests we'd write:
 
-Suggested tests:
+1. Happy path: a `JsonMergePatch` changes a field and the result passes validation.
+1. Validation failure: a patch produces an invalid object and `ConstraintViolationException` is thrown.
+1. Malformed patch: bad or incompatible operations produce a `JsonPatchException`.
+1. Polymorphism: if your app uses `@JsonTypeInfo` or similar, subtype fields survive the round trip.
 
-1. Happy path — a `JsonMergePatch` changes a field and the resulting object
-   validates.
-1. Validation failure — a patch produces an invalid object and
-   `ConstraintViolationException` is thrown.
-1. Malformed patch — malformed or incompatible operations produce
-   `JsonPatchException`.
-1. Polymorphism — verify subtype fields survive the round-trip when your app
-   uses `@JsonTypeInfo` or other polymorphic settings.
-
-Example JUnit snippet:
+Here's a JUnit test for the happy path:
 
 ```java
 @Test
@@ -165,6 +127,7 @@ void mergePatch_updatesField_andValidates() {
 	assertEquals("new@example.com", patched.getEmail());
 }
 ```
+
 ## Full implementation
 
 ```java
@@ -289,10 +252,10 @@ public class JsonPatchProcessor {
 
 ## Spring converters
 
-Spring MVC needs converters to convert incoming requests to `JsonMergePatch` and
-`JsonPatch` instances:
+Spring MVC doesn't know how to turn a request body into a `JsonMergePatch` or `JsonPatch` on its own. These two message
+converters handle that.
 
-### `JsonMergePatchHttpMessageConverter`
+### JsonMergePatchHttpMessageConverter
 
 ```java
 import org.springframework.http.HttpInputMessage;

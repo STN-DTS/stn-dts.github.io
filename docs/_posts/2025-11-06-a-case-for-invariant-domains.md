@@ -9,54 +9,46 @@ categories:
 - ddd
 ---
 
-Over the last decade or so, I've observed (and even participated in) a troubling
-trend in software development: the rise of anemic domain objects. These are data
-structures that masquerade as domain models but lack any real behavior, serving
-merely as passive containers for data. This approach leads to objects with no
-inherent data integrity, forcing developers to scatter sanity checks throughout
-the codebase. In this post, I'll make the case for embracing rich domain models
-with strong invariants, drawing on insights from industry leaders like Martin
-Fowler, Microsoft, and Amazon.
+For the last ten years or so I've watched (and, honestly, helped spread) a habit I don't like: anemic domain objects.
+These are classes that look like domain models but don't do anything. They hold data and that's it. Because nothing stops
+them from holding bad data, everyone who uses them ends up writing their own sanity checks, and those checks get
+scattered all over the codebase.
 
-## The problem with anemic domain objects
+In this post I want to argue for the opposite: rich domain models that protect their own rules. I'll lean on what Martin
+Fowler, Microsoft, and Amazon have said and done along the way.
 
-Anemic domain objects are the result of a misguided separation of concerns.
-Instead of encapsulating both data and behavior, these objects are stripped of
-any logic, leaving them as little more than classes of getters and setters. All
-business rules, validations, and computations are relegated to service classes
-that operate on these inert objects.
+## What's wrong with anemic domain objects
 
-As Martin Fowler aptly described in his 2003 article "Anemic Domain Model," this
-anti-pattern is fundamentally at odds with the core principles of encapsulation
-and modular design. Fowler argues that combining data and behavior together is
-essential for effective software modeling. Anemic models, however, revert to a
-procedural style, incurring the costs of a domain model without reaping its
-benefits.
+An anemic domain object is usually what you get when someone takes "separation of concerns" a step too far. The data
+lives in one class and the behavior lives somewhere else. The domain class ends up as a bag of getters and setters, and
+all the business rules, validation, and calculations move into service classes that push that data around.
 
-The consequences are severe:
+Martin Fowler called this out back in 2003 in his article "Anemic Domain Model". His point was that it works against
+encapsulation, the basic object-oriented idea of keeping data and the code that changes it together. An anemic model is
+really procedural code wearing an object costume. You pay the cost of building a domain model and get none of the
+payoff.
 
-1. **Scattered validation logic**: Without invariants enforced at the object
-   level, validation checks proliferate across the application, leading to
-   inconsistent and hard-to-maintain code.
+In practice this causes a few problems.
 
-2. **Data integrity issues**: Objects can exist in invalid states, requiring
-   constant vigilance from calling code to ensure correctness.
+Validation gets scattered. If the object doesn't enforce its own rules, every caller has to check things itself. Those
+checks drift apart over time and become hard to maintain.
 
-3. **Lost abstraction**: The domain model fails to capture the rich semantics of
-   the business problem, making the code less expressive and harder to
-   understand.
+Objects can be in an invalid state. Nothing prevents a half-built or nonsensical object from existing, so calling code
+always has to be on guard.
 
-4. **Increased coupling**: Services become bloated with domain logic, tightly
-   coupling business rules to application flow.
+The code stops describing the business. The model doesn't capture what the domain actually means, so the code is harder
+to read and reason about.
 
-## The power of invariant-rich domains
+Services get bloated. All the domain logic piles up in services, which ties the business rules tightly to the
+application flow.
 
-In contrast, a rich domain model embeds behavior directly within the domain
-objects, enforcing invariants that maintain data integrity at all times.
-Invariants are rules that must always hold true for the object's state,
-preventing invalid transitions and ensuring consistency.
+## Putting the rules back in the object
 
-Consider a simple `BankAccount` example:
+A rich domain model puts the behavior inside the domain objects themselves. Those objects enforce *invariants*: rules
+about their state that must always be true. If an object never lets itself break an invariant, it can never end up in
+an invalid state.
+
+Here's a simple `BankAccount`:
 
 ```java
 public class BankAccount {
@@ -124,27 +116,24 @@ public class BankAccount {
 }
 ```
 
-Here, the `BankAccount` class enforces key invariants:
+This class enforces a handful of rules:
 
-- Balance cannot be negative
-- Initial balance and amounts cannot be null
-- Deposits and withdrawals must be positive amounts
-- Operations are blocked on frozen accounts
-- Insufficient funds prevent overdrafts
+- The balance can't be negative.
+- The initial balance and any amount passed in can't be null.
+- Deposits and withdrawals must be positive.
+- You can't deposit to or withdraw from a frozen account.
+- You can't withdraw more than the balance, so no overdrafts.
 
-These rules are encapsulated within the object, making it impossible to create
-or mutate the account into an invalid state. Calling code can trust that any
-`BankAccount` instance is always valid.
+All of those rules live inside the class. There's no way to create an account in a bad state or change it into one. So
+any code that gets a `BankAccount` can trust that it's valid without checking.
 
-## The Role of Value Objects
+## Value objects
 
-One of the most effective ways to enforce invariants is through Value Objects.
-Instead of using primitive types like `BigDecimal` or `String` directly in your
-entities, wrap them in strongly-typed objects that enforce their own internal
-rules.
+A good way to push invariants down even further is with *value objects*. A value object is a small, immutable type
+that's defined by its value rather than by an identity, like an amount of money or an email address. Instead of passing
+raw `BigDecimal` or `String` values into your entities, you wrap them in a type that checks its own rules.
 
-For example, instead of passing a raw `BigDecimal` to `deposit`, we could use a
-`Money` value object:
+For example, instead of passing a raw `BigDecimal` to `deposit`, we could use a `Money` value object:
 
 ```java
 public record Money(BigDecimal amount) {
@@ -161,88 +150,73 @@ public record Money(BigDecimal amount) {
 }
 ```
 
-This simplifies the `BankAccount` entity, as it no longer needs to validate that
-the amount is positive—the `Money` type guarantees it.
+This makes `BankAccount` simpler. It no longer has to check for null or negative amounts itself, because a `Money` can't
+be created with one.
 
-## Industry perspectives
+## What others have said
 
-This approach aligns with Domain-Driven Design (DDD) principles championed by
-Eric Evans in his seminal book. Evans emphasizes that the domain model should
-capture the "heart of business software," with rich behavior and strict
-invariants.
+This is a core idea in Domain-Driven Design (DDD), from Eric Evans' well-known book of the same name. Evans says the
+domain model is the "heart of business software", and that it should carry real behavior and strict invariants.
 
-Microsoft's .NET architecture guidance reinforces this view. In their
-documentation on DDD-oriented microservices, they explicitly warn against anemic
-domain models, stating that domain entities should capture data *plus* behavior.
-They advocate for Plain Old CLR Objects (POCOs) that remain agnostic to
-infrastructure concerns while embodying rich domain logic.
+Microsoft's .NET architecture guidance says the same thing. Its docs on DDD-oriented microservices warn against anemic
+domain models and say domain entities should hold data *plus* behavior. Microsoft recommends Plain Old CLR Objects
+(POCOs), which are plain classes with no dependency on frameworks or infrastructure, that still contain the domain
+logic.
 
-Amazon, a pioneer in large-scale microservices architecture, has long embraced
-DDD to manage complexity. Their services often feature sophisticated domain
-models that enforce business rules at the core, enabling reliable scaling and
-evolution. While specific internal implementations aren't public, Amazon's
-emphasis on bounded contexts and domain expertise in their architecture patterns
-suggests a commitment to rich, invariant-preserving domains.
+Amazon has used DDD for a long time to manage the complexity of its large microservice architecture. We can't see their
+internal code, but their focus on bounded contexts (clear boundaries around each part of the domain) and on domain
+expertise suggests they build rich domains that enforce their own business rules at the core.
 
-## Benefits in practice
+## What you get out of it
 
-Adopting invariant-rich domains yields tangible benefits:
+Moving the rules into the domain pays off in a few ways.
 
-1. **Improved reliability**: Invariants prevent corrupt data from propagating
-   through the system, reducing bugs and improving overall system stability.
+Bad data stops spreading. If an invalid object can't exist, it can't leak into the rest of the system and cause bugs
+somewhere far away.
 
-2. **Enhanced maintainability**: Business rules are centralized and clearly
-   expressed, making changes easier and less error-prone.
+Changes get easier. Business rules live in one obvious place and are written down clearly, so changing them is less
+risky.
 
-3. **Better testability**: Domain objects can be tested in isolation, with
-   invariants providing clear success criteria.
+Testing gets simpler. You can test a domain object on its own, and the invariants tell you exactly what to test.
 
-4. **Increased expressiveness**: The code becomes a more accurate reflection of
-   the business domain, improving communication between developers and domain
-   experts.
+The code matches the business. When the code reads like the domain, it's easier for developers and domain experts to
+talk about it.
 
-5. **Reduced coupling**: Services focus on orchestration rather than business
-   logic, leading to more modular and flexible architectures.
+Services get thinner. They coordinate work instead of holding business logic, which keeps the design more modular.
 
-## Challenges and mitigations
+## The hard parts
 
-Transitioning to rich domain models isn't without hurdles. Developers accustomed
-to anemic models may initially struggle with placing logic in the "right" place.
+Switching to rich domain models isn't free. If you're used to anemic models, it can take a while to get a feel for
+where logic belongs.
 
-### Addressing Persistence Challenges
+### Persistence
 
-A common objection to rich domain models is the friction with Object-Relational
-Mappers (ORMs) like Hibernate or Entity Framework. These tools often require
-public no-argument constructors and setters to hydrate objects from the
-database, which can undermine encapsulation.
+The most common pushback is about Object-Relational Mappers (ORMs) like Hibernate or Entity Framework. ORMs load rows
+from the database into objects, and many of them want a public no-argument constructor and public setters to do it.
+That undercuts encapsulation, because now anyone can build an empty object or change its fields.
 
-To bridge this gap:
+There are a few ways around this:
 
-* **Private Constructors**: Most modern ORMs can use private or protected
-  constructors and field access, allowing you to keep your public API clean.
-* **Mapping Layers**: Separate your domain model from your persistence model.
-  Use a "dumb" data object for the database and map it to your rich domain
-  entity. This decoupling allows your domain logic to evolve independently of
-  your database schema.
-* **Memento Pattern**: Expose a snapshot of the state for persistence without
-  exposing mutators.
+- Use private constructors. Most modern ORMs can work with private or protected constructors and set fields directly,
+  so your public API stays clean.
+- Add a mapping layer. Keep a separate "dumb" persistence object for the database and map it to and from your rich
+  domain entity. This lets your domain logic change without being tied to your database schema.
+- Use the Memento pattern. The object hands out a snapshot of its state for saving, without exposing any setters.
 
-### Other Mitigations
+### Other things that help
 
-- Starting small: Begin by adding invariants to new or refactored classes
-- Using aggregate roots in DDD to manage complex object graphs
-- Employing domain events to communicate state changes
-- Leveraging tools like property-based testing to validate invariants
+- Start small. Add invariants to new classes, or to classes you're already refactoring.
+- Use aggregate roots (a DDD idea: one entity that controls access to a group of related objects) to manage complex
+  object graphs.
+- Use domain events to announce state changes.
+- Use property-based testing, which throws lots of generated inputs at your code, to check that invariants hold.
 
-## Conclusion
+## Wrapping up
 
-The trend toward anemic domain objects has led to fragile, hard-to-maintain
-systems burdened by scattered validation logic. By embracing rich domain models
-with strong invariants, we can build software that truly captures the essence of
-the business domain while ensuring data integrity and reliability.
+Anemic domain objects have given us fragile systems that are hard to maintain, with validation code spread everywhere.
+If we build rich domain models with strong invariants instead, the code can actually describe the business while keeping
+the data valid.
 
-As Fowler, Microsoft, and Amazon demonstrate, this approach isn't just
-theoretically sound—it's proven at scale. In an era of increasingly complex
-software systems, invariant domains offer a path to more robust, maintainable,
-and expressive code. It's time to restore the essence of encapsulation in our
-design and let our domain models do more than just hold data.
+Fowler, Microsoft, and Amazon show this isn't just theory. It works at scale. As our systems keep getting more complex,
+invariant domains give us more reliable, maintainable, and readable code. It's time to bring encapsulation back and let
+our domain models do more than hold data.

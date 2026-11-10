@@ -11,145 +11,102 @@ categories:
 - oauth2
 ---
 
-If your tenant is tightly governed, setting up app registrations can feel like
-trying combinations on a lock. You wire up what looks correct, sign in, and get
-a consent or permission error you did not expect.
+If your tenant is tightly locked down, setting up app registrations can feel like guessing a lock combination. You wire
+up something that looks right, sign in, and hit a consent or permission error you didn't expect.
 
-I have run into this repeatedly when connecting a frontend to a protected API in
-a tenant where delegated permissions are not allowed unless the client is
-pre-authorized by the API. Add tenant-wide admin approval requirements for
-Microsoft Graph, and even basic sign-in flows can produce warnings.
+I've run into this again and again when connecting a frontend to a protected API in a tenant where users can't grant
+delegated permissions (letting an app act on their behalf) unless the API has pre-authorized that client app. Add
+tenant-wide admin approval for Microsoft Graph permissions on top of that, and even a basic sign-in can show warnings.
 
-This post is practical guidance for that environment. It is written for the
-Azure Portal, but it works the same if you automate with IaC.
+This post is practical advice for that kind of tenant. I describe the steps in the Azure Portal, but they're the same if
+you automate with infrastructure as code (IaC).
 
-## The trust chain you actually need
+## The trust chain
 
-Most teams think in terms of two apps:
+Most teams think of this as two apps: a frontend app and an API app.
 
-1. Frontend app
-2. API app
+In a restricted tenant there's a third piece you can't skip: a pre-authorization link from the API to the client.
+Without it, the client can ask for scopes, but in practice users still can't grant it access.
 
-In restricted tenants, there is usually a third piece you cannot skip:
+Here's the mental model I use. Every piece has to be in place:
 
-3. A pre-authorization link from API to client
+- The API app defines its scopes and app roles.
+- The client app lists the API permissions it needs.
+- The API app pre-authorizes that specific client for specific scopes.
+- An admin grants consent wherever tenant policy requires it, for example for Microsoft Graph permissions.
 
-Without that link, the client can request scopes, but users still cannot
-delegate access in practice.
+If any one of these is missing, sign-in usually fails later on, and it looks like a bug in your code rather than a
+configuration problem.
 
-A reliable mental model is:
+## Setting it up
 
-- The API app defines scopes and app roles
-- The client app declares required permissions to that API
-- The API app pre-authorizes that specific client app for specific scopes
-- An admin grants consent where tenant policy requires it (for example, when
-  making calls to MS Graph APIs)
+Do things in this order. It saves a lot of trial and error.
 
-If any one of those is missing, the login flow usually fails later and looks
-like a runtime bug.
+### 1. Define the API first
 
-## Setup patterns that work
+Create the API app registration and publish the permissions it offers:
 
-Use this order. It saves a lot of trial and error.
+- Set the Application ID URI for the API.
+- Define delegated scopes, with clear names and consent text.
+- Define app roles if you need application permissions.
+- Make sure the scope values are final before you wire up any clients.
 
-### Pattern 1: define the API contract first
+The API comes first because every client's configuration depends on its scope IDs and values staying the same.
 
-Create the API app registration and publish the permissions it offers.
-
-Checklist:
-
-- Set the Application ID URI for the API
-- Define delegated scopes with clear names and consent display text
-- Define app roles if you need application permissions
-- Confirm the scope values are final before wiring clients
-
-Why first? Because every client configuration depends on stable scope IDs and
-scope values.
-
-### Pattern 2: register each client with explicit required permissions
+### 2. Register each client with its permissions spelled out
 
 For each client app (for example, your frontend and your CLI):
 
-- Add required API permissions to the target API scopes
-- Add required Microsoft Graph permissions
-- Configure redirect URIs and auth settings for that client type
+- Add the API scopes it needs as required permissions.
+- Add the Microsoft Graph permissions it needs.
+- Set up redirect URIs and auth settings for that type of client.
 
-Keep this boring and explicit. Do not rely on "we will fix it in consent later"
-as a strategy.
+Keep this boring and explicit. "We'll sort it out at consent time" is not a plan.
 
-### Pattern 3: pre-authorize clients on the API app
+### 3. Pre-authorize clients on the API
 
-This is the step that is often forgotten in restricted tenants.
+This is the step people forget in restricted tenants. For each client that calls the API:
 
-For each client that calls the API:
+- Open the API app registration.
+- Add the client app as an authorized client.
+- Select the API scopes that client is allowed to request.
 
-- Open the API app registration
-- Add the client app as an authorized client
-- Select the API scopes that client is allowed to request
+If your tenant blocks user delegation without pre-authorization, this is the step that turns a setup that "looks right"
+into one that actually works.
 
-If your tenant blocks user delegation unless pre-authorization exists, this is
-what turns a configuration that "looks right" into one that actually works.
+### 4. Get admin consent on purpose
 
-### Pattern 4: complete admin consent intentionally
+In many organizations, Microsoft Graph permissions need admin approval, even delegated ones. So expect consent warnings
+at sign-in until an administrator grants consent for the Graph scopes you request.
 
-In many organizations, Microsoft Graph permissions require admin approval,
-including delegated permissions.
+Plan this as its own step. Don't leave it as an afterthought.
 
-That means you should expect consent warnings during sign-in until an
-administrator grants consent for the requested Graph scopes.
+## Tenant quirks to expect
 
-Do this as an explicit operational step, not as an afterthought.
+### Delegated permissions fail without pre-authorization
 
-## Tenant quirks you should expect
+You'll see this when sign-in works but calls to the API fail with consent or "insufficient privileges" errors.
 
-### Quirk 1: delegated permissions fail without API pre-authorization
+Usually the client asked for a valid API scope, but the API app hasn't pre-authorized that client. To fix it, add the
+client as a pre-authorized client in the API app registration, then double-check that the exact scopes the client
+requests are selected.
 
-Symptom:
+### Graph delegated permissions still need admin approval
 
-- User sign-in succeeds, but API access fails with consent or insufficient
-  privileges style errors
+You'll see warnings or admin approval prompts at sign-in, even for basic sign-in scopes.
 
-Typical root cause:
+This happens because tenant policy requires admin consent for Microsoft Graph permissions. Have an admin grant consent
+for the Graph permissions the client requests. Keep your list of Graph scopes short so it's easy for them to review.
 
-- Client requested a valid API scope, but the API app has not pre-authorized
-  that client
+### Scope names match, but IDs differ between environments
 
-Fix:
+Non-prod works, but another environment fails with what looks like a consent mismatch.
 
-- Add client pre-authorization in the API app registration
-- Re-check that the exact scopes requested by the client are selected
+Usually the client is pointed at the wrong API registration, or it's using scope IDs copied from somewhere else. Check
+the API app ID, the client app ID, and the target scopes in each environment. Then set up the pre-authorization link
+again for the right client and API pair.
 
-### Quirk 2: Graph delegated permissions still need admin approval
-
-Symptom:
-
-- Login shows warnings or admin approval prompts even for basic sign-in scopes
-
-Typical root cause:
-
-- Tenant policy requires administrator consent for Microsoft Graph permissions
-
-Fix:
-
-- Have an admin grant consent for Graph permissions requested by the client
-- Keep your Graph scope request minimal so approvals are easier to review
-
-### Quirk 3: scope names are correct, but IDs drift between environments
-
-Symptom:
-
-- Nonprod works, another environment fails with consent mismatch behavior
-
-Typical root cause:
-
-- Client is wired to the wrong API registration or stale scope identifiers
-
-Fix:
-
-- Verify the API app ID, client app ID, and target scopes per environment
-- Re-apply the pre-authorization link for the correct client and API pair
-
-## Fast troubleshooting matrix
+## Quick troubleshooting table
 
 | Symptom | Most likely cause | Where to fix |
 |---|---|---|
@@ -158,24 +115,20 @@ Fix:
 | Azure Portal frontend works but Swagger UI fails (or vice versa) | One client app was configured, the other was not | Compare required permissions and pre-authorization per client |
 | Everything looks configured but still fails in one env | IDs or scopes copied from another environment | Re-validate app IDs, scope values, and consent in that environment |
 
-## Practical guardrails for teams
+## Habits that help
 
-A few habits make this easier:
+A few team habits make this a lot less painful. Treat API scopes as a contract and be careful when you change them. Keep
+a short checklist for every new client app. Make pre-authorization a required item in reviews. And talk to your tenant
+admins early about Graph consent.
 
-- Treat API scopes as a contract and version changes carefully
-- Keep a short checklist for every new client app
-- Make pre-authorization a required review item
-- Involve tenant admins early for Graph consent requirements
+None of these steps is hard on its own. The pain comes from missing one link in the chain and only finding out at
+sign-in.
 
-None of this is complicated on its own. The pain comes from missing one link in
-the chain and discovering it only at sign-in time.
+## Wrapping up
 
-## Conclusion
+In a tenant with strict consent policy, setting up app registrations is less about flipping the right switches and more
+about building a complete trust chain.
 
-If your tenant enforces strict consent policy, app registration setup is less
-about toggling options and more about building a complete trust chain.
-
-Define API scopes first, wire client permissions explicitly, pre-authorize
-clients on the API, and plan for admin consent on Graph from day one. That
-sequence removes most of the guesswork and gives developers a setup that works
-predictably.
+Define the API scopes first. Give each client its permissions explicitly. Pre-authorize clients on the API. Plan for
+Graph admin consent from day one. Do it in that order and most of the guesswork goes away, and developers get a setup
+that behaves the same way every time.

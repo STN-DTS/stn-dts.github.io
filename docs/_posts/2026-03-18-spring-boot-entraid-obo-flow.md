@@ -11,79 +11,64 @@ categories:
 - security
 ---
 
-The OAuth 2.0 on-behalf-of flow solves a very specific problem: your API
-receives a user token, but the real work happens in another protected API
-further downstream. You cannot just forward the original bearer token and hope
-the next service accepts it. When using OAuth, the right move is to exchange
-that incoming user token for a new access token that is scoped for the
-downstream API.
+The OAuth 2.0 on-behalf-of (OBO) flow solves one specific problem. Your API receives a user's access token, but the
+real work happens in another protected API further downstream. You can't just forward the original bearer token and
+hope the next service accepts it, because that token was issued for *your* API, not the next one. With OAuth, the right
+move is to exchange the incoming user token for a new access token that's issued for the downstream API.
 
-That matters any time you need to preserve user identity across service
-boundaries. A gateway calls an orders API. The orders API calls a CRM. A web app
-calls a backend, and that backend needs to read a secure internal data service
-using the caller's delegated permissions. The downstream system should see a
-token meant for it, not a token minted for something else.
+You need this any time the user's identity has to carry across service boundaries. A gateway calls an orders API, and
+the orders API calls a CRM. Or a web app calls a backend, and that backend needs to read from a secure internal data
+service using the caller's delegated permissions ("delegated" means the app acts with the user's permissions, not its
+own). In each case the downstream system should get a token meant for it, not a token minted for something else.
 
-This post walks through a Spring Boot pattern that keeps that exchange logic out
-of your business code. The core idea is simple: put the OBO exchange behind a
-customized `RestClient`, let Spring Security perform the token acquisition, and
-add a small cache so you do not hit the token endpoint on every downstream
-request.
+In this post I'll walk through a Spring Boot pattern that keeps the exchange logic out of your business code. The idea
+is simple. Put the OBO exchange behind a customized `RestClient`, let Spring Security fetch the token, and add a small
+cache so you don't hit the token endpoint on every downstream request.
 
 ## What the flow needs to do
 
-At runtime, the request path looks like this:
+At runtime, a request goes through these steps:
 
 1. A user calls your API with a JWT access token.
 2. Your application authenticates that token as usual.
-3. A downstream client within your API issues an HTTP call through a
-  `RestClient`.
+3. A downstream client inside your API makes an HTTP call through a `RestClient`.
 4. An OAuth2 interceptor asks for an access token for the downstream API.
-5. A custom OBO provider takes the incoming JWT, sends it to Entra ID with
-   `requested_token_use=on_behalf_of`, and gets back a new access token.
+5. A custom OBO provider takes the incoming JWT, sends it to Entra ID with `requested_token_use=on_behalf_of`, and gets
+   back a new access token.
 6. The `RestClient` sends the downstream request with that new token.
 
-The nice part is where this happens. Your use case code stays boring. It calls a
-typed client. The typed client knows nothing about JWT parsing or token
-endpoints. The infrastructure layer owns that problem.
+What I like here is where this happens. Your use case code stays boring: it calls a typed client. The typed client
+knows nothing about parsing JWTs or calling token endpoints. The infrastructure layer owns that problem.
 
-## Why `RestClient` is a good fit here
+## Why `RestClient` is a good fit
 
-You can implement OBO in a service class, or inside a filter, or with a custom
-HTTP client wrapper that does everything itself. I don't like any of those.
+You could do the OBO exchange in a service class, in a filter, or in a custom HTTP client wrapper that does everything
+itself. I don't like any of those.
 
-Putting the flow behind `RestClient` has a cleaner boundary:
+Putting it behind `RestClient` gives you a cleaner boundary. The application service depends on a downstream port or a
+typed client. Authentication stays in the infrastructure layer. A token is only fetched when you actually make a
+downstream call, and Spring Security still handles the OAuth2 protocol details.
 
-- The application service depends on a downstream port or typed client.
-- Authentication stays in infrastructure.
-- Token acquisition happens only when you actually make a downstream call.
-- Spring Security still owns the OAuth2 protocol details.
+That separation is why the pattern holds up. The domain code doesn't know what Entra ID is. The controller doesn't fetch
+tokens by hand. The HTTP client doesn't contain business logic. Each layer has one job.
 
-That separation is what makes the pattern hold up. The domain code does not know
-what Entra ID is. The controller does not manually fetch tokens. The transport
-client does not need business logic. Each layer gets one job.
+## How the pieces fit together
 
-## The architecture in one slice
+In a typical hexagonal Spring Boot app (one where business logic talks to the outside world only through interfaces
+called ports), the pieces look like this:
 
-For a typical hexagonal Spring Boot application, the pieces look like this:
-
-- `OrderService` or another application service calls a downstream port.
+- `OrderService`, or some other application service, calls a downstream port.
 - `DownstreamApiClient` is a small infrastructure wrapper around `RestClient`.
-- `OAuth2ClientHttpRequestInterceptor` acquires tokens when requests leave the
-  process.
-- `DownstreamOboTokenProvider` teaches Spring Security how to perform the Entra
-  ID OBO exchange.
-- `OboTokenCache` reuses exchanged tokens for the same source JWT until either
-  token is close to expiry.
+- `OAuth2ClientHttpRequestInterceptor` gets tokens when requests leave the process.
+- `DownstreamOboTokenProvider` teaches Spring Security how to do the Entra ID OBO exchange.
+- `OboTokenCache` reuses exchanged tokens for the same source JWT until either token is close to expiring.
 
-That arrangement gives you a narrow seam for testing and a clear place to put
-operational safeguards.
+This gives you one narrow seam to test and one obvious place to put operational safeguards.
 
 ## Start with a typed `RestClient`
 
-The first step is to hide raw HTTP details behind a client that represents the
-downstream dependency. The business layer should call methods, not hand-build
-URLs.
+First, hide the raw HTTP details behind a client that represents the downstream dependency. The business layer should
+call methods, not build URLs by hand.
 
 ```java
 public final class DownstreamApiClient {
@@ -112,14 +97,12 @@ public final class DownstreamApiClient {
 }
 ```
 
-That is deliberately thin. It owns only the HTTP wiring and response
-deserialization. It does not know anything about Entra ID. That comes from the
-interceptor you inject into it.
+This is thin on purpose. It only handles HTTP wiring and turning the response into objects. It knows nothing about
+Entra ID. That part comes from the interceptor you pass in.
 
-## Wire OBO into the `RestClient`, not into your service layer
+## Wire OBO into the `RestClient`, not your service layer
 
-The cleanest place to assemble the flow is auto-configuration or a dedicated
-configuration class.
+The cleanest place to put all of this together is an auto-configuration or a dedicated configuration class.
 
 ```java
 @ConfigurationProperties("app.downstream")
@@ -207,24 +190,20 @@ public class DownstreamApiAutoConfiguration {
 }
 ```
 
-There are a few details here worth calling out.
+A few details here are worth pointing out.
 
-First, the client registration uses `AuthorizationGrantType.JWT_BEARER`. That
-is the grant Spring Security uses for the OBO exchange. Second, the
-`SecurityContextHolderPrincipalResolver` means the interceptor will use the
-currently authenticated principal for the outgoing request. Third, the startup
-validation fails fast with the exact missing properties. That sounds small until
-you debug a bad deployment at 4 a.m. on a Saturday night.
+The client registration uses `AuthorizationGrantType.JWT_BEARER`. That's the grant type Spring Security uses for the
+OBO exchange. The `SecurityContextHolderPrincipalResolver` tells the interceptor to use the currently authenticated user
+for the outgoing request. And the startup validation fails fast, listing exactly which properties are missing. That
+sounds minor until you're debugging a bad deployment at 4 a.m. on a Saturday night.
 
-I also prefer the no-op authorized-client service in this setup. OBO is driven
-by the current request's user token, so I want reuse to be explicit and scoped
-to the dedicated OBO cache rather than hidden inside a generic client store.
+I also prefer the no-op authorized-client service here. OBO is driven by the current request's user token, so I want
+token reuse to be explicit and limited to the dedicated OBO cache, not hidden inside a generic client store.
 
-## Retrieve the incoming token from the authenticated principal
+## Get the incoming token from the authenticated principal
 
-The incoming JWT is already in the security context after resource-server
-authentication. Do not fish it out of headers in your service code. Let Spring
-Security hand it to the authorized-client provider.
+After the resource server authenticates the request, the incoming JWT is already in the security context. Don't dig it
+out of the request headers in your service code. Let Spring Security hand it to the authorized-client provider.
 
 ```java
 public final class DownstreamOboTokenProvider implements OAuth2AuthorizedClientProvider {
@@ -285,21 +264,19 @@ public final class DownstreamOboTokenProvider implements OAuth2AuthorizedClientP
 }
 ```
 
-Two things make this production-worthy.
+Two things make this safe to run in production.
 
-The first is the `jwtAssertionResolver`. It forces the assertion used in the
-token exchange to come from the authenticated `JwtAuthenticationToken`, not from
-some ad hoc thread-local or request attribute. If there is no JWT-backed
-principal, the flow fails clearly.
+The first is the `jwtAssertionResolver`. It makes sure the token sent in the exchange (the "assertion") comes from the
+authenticated `JwtAuthenticationToken`, not from some ad hoc thread-local or request attribute. If there's no
+JWT-backed principal, the flow fails with a clear error.
 
-The second is the parameter customizer. Entra ID expects
-`requested_token_use=on_behalf_of` on the token request. If you skip that,
-you are not doing OBO. You are just sending a JWT bearer token request and
-hoping Entra guesses your intent.
+The second is the parameter customizer. Entra ID expects `requested_token_use=on_behalf_of` on the token request. If
+you leave it out, you aren't doing OBO. You're just sending a JWT bearer token request and hoping Entra guesses what you
+meant.
 
 ## What Entra ID actually receives
 
-The request body generated by this setup ends up looking roughly like this:
+With this setup, the token request body looks roughly like this:
 
 ```text
 grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer
@@ -310,31 +287,22 @@ client_secret=<your client secret>
 scope=api://downstream-api/.default
 ```
 
-That combination is the heart of the flow.
+Each field has a job. The assertion is the original user token. The client ID and secret identify your API as the
+confidential client making the exchange. The scope points at the downstream API, not the current one. And the
+on-behalf-of flag tells Entra ID what kind of exchange you want.
 
-- The assertion is the original user token.
-- The confidential client credentials identify your API as the caller making
-  the exchange.
-- The scope targets the downstream API, not the current API.
-- The on-behalf-of flag tells Entra ID what kind of exchange you want.
+If the downstream API permissions are wrong, or the app registrations aren't set up to trust each other, this request
+fails. That's a configuration problem, not a code problem.
 
-If the downstream API permissions are wrong, or the app registration trust chain
-is incomplete, this request fails. That is a configuration problem, not a code
-problem.
+## Add a cache or you'll exchange too often
 
-## Add a cache or you will exchange too often
+Without a cache, every downstream call can trigger a token exchange. It works, but it's noisy, slower than it needs to
+be, and puts extra load on the token endpoint.
 
-Without a cache, every downstream call may trigger a token exchange. That works,
-but it is noisy, slower than it needs to be, and harder on your token endpoint.
-
-The implementation I like is intentionally narrow. Cache exchanged authorized
-clients by the source JWT's issuer, subject, and a SHA-256 fingerprint of the
-raw token. Then expire the cache entry at the earlier of:
-
-- the source JWT expiry
-- the exchanged access-token expiry
-
-and subtract a small skew before you consider the entry reusable.
+The cache I like is deliberately narrow. It stores exchanged authorized clients keyed by the source JWT's issuer, its
+subject, and a SHA-256 fingerprint (hash) of the raw token. Each entry expires at whichever comes first: the source
+JWT's expiry or the exchanged access token's expiry. A small skew is subtracted from that time before the entry counts
+as reusable.
 
 ```java
 public final class OboTokenCache {
@@ -423,35 +391,29 @@ public final class OboTokenCache {
 }
 ```
 
-There are three practical ideas buried in that code.
+There are three practical ideas in that code.
 
-First, the cache key includes a fingerprint of the raw incoming token. If the
-user token rotates, the cache entry is no longer reused. That is exactly what
-you want.
+First, the cache key includes a fingerprint of the raw incoming token. When the user's token rotates, the old cache
+entry stops being used. That's what you want.
 
-Second, the effective expiry is based on the earlier of the source token and the
-downstream token. If the source JWT is gone, the cached OBO token should not be
-reused even if its own expiry is later.
+Second, the expiry is based on whichever token expires first. Once the source JWT has expired, the cached OBO token
+shouldn't be reused, even if its own expiry is later.
 
-Third, the second cache lookup before exchange is not accidental. It reduces
-duplicate token exchanges when several requests arrive at the same time.
+Third, the second cache lookup right before the exchange is deliberate. It cuts down on duplicate token exchanges when
+several requests arrive at the same time.
 
 ## Log enough to debug, but never log secrets
 
-The token exchange path is the sort of code you only notice when it breaks. Good
-logging matters.
+You only notice the token exchange code when it breaks, so good logging pays off. Here's what I recommend:
 
-The pattern I recommend is:
-
-- Log when a provider skips authorization because the registration ID does not
-  match.
-- Log when the principal is not a `JwtAuthenticationToken`.
+- Log when a provider skips authorization because the registration ID doesn't match.
+- Log when the principal isn't a `JwtAuthenticationToken`.
 - Log cache reuse, miss, recheck hit, exchange, expiry, and store events.
-- Include stable identifiers like issuer and subject.
-- Never log the raw JWT, access token, client secret, or token request body.
+- Include stable identifiers like the issuer and subject.
+- Never log the raw JWT, the access token, the client secret, or the token request body.
 
-If you get this wrong, you either have no signal during production failures or
-you leak exactly the material an incident review will ask why you wrote to logs.
+Get this wrong and you either have nothing to go on when production fails, or you've written exactly the material an
+incident review will ask why you logged.
 
 ## Make configuration explicit
 
@@ -473,21 +435,16 @@ app:
       scope: api://downstream-api/User.Read.All
 ```
 
-You can shape the property names however you like. The important part is the
-contract:
+Name the properties however you like. What matters is what they mean. `client-id` and `client-secret` identify your
+confidential client. `token-url` points at your tenant's Entra token endpoint. `scope` targets the downstream API. The
+cache settings control how aggressively exchanged tokens get reused.
 
-- `client-id` and `client-secret` identify your confidential client.
-- `token-url` points at the tenant-specific Entra token endpoint.
-- `scope` targets the downstream API.
-- cache settings control how aggressively you reuse exchanged tokens.
+If your application makes both OBO calls and service-account calls, use separate client registrations for them, even if
+they point at the same downstream API. They authenticate in different ways, and your code should make that clear.
 
-If your application supports both OBO and service-account calls, keep those as
-separate client registrations even if they point at the same downstream API.
-The authentication model is different. Your code should say so.
+## The service that uses the client stays simple
 
-## A service that uses the client stays simple
-
-Once the client is wired, application code does not carry any OAuth2 ceremony.
+Once the client is wired up, your application code doesn't carry any OAuth2 boilerplate.
 
 ```java
 public final class OrderService {
@@ -508,91 +465,71 @@ public final class OrderService {
 }
 ```
 
-That is the payoff. The OBO flow exists, but it is not leaking across the whole
-application.
+That's the payoff. The OBO flow is there, but it doesn't leak across the whole application.
 
-## Gotchas that are easy to miss
+## Gotchas
 
-These are the things that usually bite people.
+These are the things that usually trip people up.
 
 ### The scope must belong to the downstream API
 
-The OBO token request is not asking for more of the current API's audience. It
-is asking for a token for the next API. If your scope value is wrong, the code
-can look perfect and still fail.
+The OBO token request isn't asking for more access to the current API. It's asking for a token for the next API. If
+your scope value is wrong, the code can look perfect and still fail.
 
 ### `requested_token_use=on_behalf_of` is not optional
 
-Spring Security gets you most of the way there, but Entra ID still expects that
-parameter on the token request. Add it explicitly.
+Spring Security gets you most of the way, but Entra ID still expects this parameter on the token request. Add it
+explicitly.
 
 ### Fail fast on missing properties
 
-Do not let the application start with a base URL and half an OAuth2 config. It
-is much better to crash during startup with a message listing the missing
-property names.
+Don't let the application start with a base URL and half an OAuth2 config. It's much better to crash at startup with a
+message that lists the missing property names.
 
 ### Cache against both token lifetimes
 
-If you only honor the downstream access-token expiry, you can accidentally reuse
-an exchanged token after the source user token should no longer authorize the
-request path.
+If you only look at the downstream access token's expiry, you can end up reusing an exchanged token after the user's
+original token should no longer be allowed through.
 
 ### Add a little expiry skew
 
-Subtracting 30 seconds from the effective expiry is a cheap way to avoid
-mid-flight failures caused by clock drift, thread scheduling, or a slow network
-hop right when a token is about to die.
+Subtracting 30 seconds from the expiry is a cheap way to avoid failures in the middle of a request. Clock drift, thread
+scheduling, or a slow network hop can otherwise catch a token right as it expires.
 
 ### Test the raw token request, not just the happy path
 
-One of the most useful tests for this pattern is asserting that the token
-endpoint receives:
+One of the most useful tests for this pattern checks that the token endpoint receives:
 
 - `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`
 - `requested_token_use=on_behalf_of`
 - the incoming JWT as `assertion`
 - the expected confidential-client credentials
 
-That test catches the exact sort of regression that otherwise shows up only when
-you deploy.
+That test catches the kind of regression that otherwise only shows up after you deploy.
 
-## What makes this pattern robust
+## Why I like this approach
 
-I like this approach because it is strict in the places that matter.
+It's strict where it matters. The business layer never touches token plumbing. The infrastructure layer only
+customizes what it has to. Startup validation catches broken config early. The cache cuts down on repeated exchanges
+without trying to be clever, and the logging is useful without leaking credentials.
 
-- The business layer never touches token plumbing.
-- The infrastructure layer does the minimum necessary customization.
-- Startup validation catches broken config early.
-- The cache reduces exchange churn without getting clever.
-- Logging is useful without turning into a credential leak.
+Most of the moving parts already exist in Spring Security. The trick is knowing where to put the Entra-specific pieces
+so the rest of the application stays boring. That's usually a good sign you picked the right design.
 
-Most of the moving parts already exist in Spring Security. The trick is knowing
-where to put the Entra-specific pieces so the rest of the application stays
-boring.
+## Appendix: calling the same downstream API with a service account
 
-That is usually a good sign you picked the right design.
+Sometimes the same downstream API needs to be called in two different ways. Calls made as part of a user's request
+should go through OBO, so the downstream API sees the caller's delegated identity. Calls made by the system itself
+should use the client credentials flow, because there's no user involved.
 
-## Appendix: using the same downstream API with a service account
+This is common in real systems. A normal API request might need OBO, while a nightly reconciliation job against the
+same downstream API runs as a service account. The target API is the same, but how you authenticate is not.
 
-Sometimes the same downstream API needs two access patterns.
-
-- User-context calls should run through OBO so the downstream API sees the
-  caller's delegated identity.
-- System-context calls should use client credentials because there is no user in
-  the loop.
-
-That is common in real systems. A synchronous API request might need OBO, while
-the nightly reconciliation job against the same downstream API should run as a
-service account. The target API is the same. The authentication model is not.
-
-The clean way to model that is to keep two client registrations and two typed
-clients, even if they share the same base URL.
+The clean way to model this is with two client registrations and two typed clients, even if they share a base URL.
 
 ### Add a second provider for client credentials
 
-The service-account side is much simpler because there is no incoming JWT to
-exchange.
+The service-account side is much simpler, because there's no incoming JWT to exchange.
 
 ```java
 public final class ServiceAccountAuthorizedClientProvider implements OAuth2AuthorizedClientProvider {
@@ -618,14 +555,12 @@ public final class ServiceAccountAuthorizedClientProvider implements OAuth2Autho
 }
 ```
 
-There is no `JwtAuthenticationToken` requirement here because the client
-credentials flow is not tied to a user principal. Spring Security just needs a
-client registration with `AuthorizationGrantType.CLIENT_CREDENTIALS`.
+There's no `JwtAuthenticationToken` requirement here because the client credentials flow isn't tied to a user. Spring
+Security just needs a client registration with `AuthorizationGrantType.CLIENT_CREDENTIALS`.
 
 ### Register a second `RestClient`
 
-The important thing is not to overload the OBO client with a second mode. Make
-the split explicit.
+Don't overload the OBO client with a second mode. Make the split explicit.
 
 ```java
 @Bean
@@ -659,17 +594,13 @@ ServiceAccountDownstreamApiClient serviceAccountDownstreamApiClient(DownstreamAp
 }
 ```
 
-This mirrors the OBO setup closely, but the behavior is different in two
-important ways.
-
-- The grant type is `CLIENT_CREDENTIALS`, not `JWT_BEARER`.
-- The authorized-client service can be the normal in-memory implementation
-  because there is no per-user token-exchange cache to control.
+This looks a lot like the OBO setup, but it differs in two important ways. The grant type is `CLIENT_CREDENTIALS`, not
+`JWT_BEARER`. And the authorized-client service can be the normal in-memory one, because there's no per-user token
+exchange cache to manage.
 
 ### Keep the API shape the same, not the auth path
 
-The easiest way to keep your application code readable is to expose two typed
-clients with the same downstream operations.
+To keep your application code readable, expose two typed clients with the same downstream operations.
 
 ```java
 public final class ServiceAccountDownstreamApiClient {
@@ -698,15 +629,14 @@ public final class ServiceAccountDownstreamApiClient {
 }
 ```
 
-Yes, that duplicates a little transport code. I still prefer it. If one client
-is user-scoped and the other is service-account scoped, I want that distinction
-visible in the type system and in dependency injection. It makes reviews easier.
-It also makes accidental privilege changes much harder to miss.
+Yes, that duplicates a little transport code. I still prefer it. If one client acts as the user and the other acts as
+a service account, I want that difference to be visible in the types and in dependency injection. It makes code reviews
+easier, and it makes an accidental change in privileges much harder to miss.
 
 ### Split the configuration on purpose
 
-If both auth modes hit the same downstream API, keep the shared transport
-settings together and split the auth settings by registration.
+If both auth modes call the same downstream API, keep the shared settings together and split the auth settings by
+registration.
 
 ```yaml
 app:
@@ -724,20 +654,15 @@ app:
             scope: api://downstream-api/.default
 ```
 
-Sometimes those scopes are the same. Sometimes they are not. The point is not
-to force one shape on every deployment. The point is to make the distinction
-obvious, because delegated and application permissions are different security
+Sometimes those scopes are the same and sometimes they aren't. The point isn't to force one shape on every deployment.
+It's to make the difference obvious, because delegated permissions and application permissions are different security
 contracts.
 
 ### Choose the client based on why the call exists
 
-That last part is architectural, not mechanical.
+This last part is about architecture, not mechanics. If the call is part of a user's request and the downstream system
+should see the user's delegated identity, use the OBO client. If it's a background job, a scheduled sync, or some other
+system-to-system action, use the service-account client.
 
-- If the call is part of a user request and the downstream system should see the
-  user's delegated identity, use the OBO client.
-- If the call is a background job, scheduled sync, or system-to-system action,
-  use the service-account client.
-
-Do not decide based on convenience. Decide based on who should be represented to
-the downstream API. If the answer is "the user," use OBO. If the answer is
-"this application," use client credentials.
+Don't pick based on convenience. Pick based on who the downstream API should see as the caller. If the answer is "the
+user," use OBO. If it's "this application," use client credentials.

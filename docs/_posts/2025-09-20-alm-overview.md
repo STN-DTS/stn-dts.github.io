@@ -6,83 +6,75 @@ date: 2025-09-20
 categories: alm devops git software-engineering
 ---
 
-Finding the sweet spot between moving fast and not breaking things is a classic developer dilemma. How do you ship features
-quickly without causing chaos in production? We've worked hard to fine-tune a workflow that gives us the best of both worlds.
-Here's a look at how we do it.
+Every team wants to ship quickly without breaking production, and those two goals pull against each other. Over time
+we've settled on a workflow that gives us a decent balance. This post walks through it in three parts: what we do day to
+day, how we get ready for a release, and how the release actually reaches production.
 
-Our process breaks down into three parts: our daily development, how we prepare for a release, and how we finally deploy to
-production.
+## Day to day on `main`
 
-## The daily grind: fast and furious on the `main` branch
+We use [Trunk-Based Development](https://trunkbaseddevelopment.com/). In practice that means the `main` branch is the
+source of truth, and everyone works to keep it healthy and ready to ship.
 
-At the heart of our daily work is [Trunk-Based Development](https://trunkbaseddevelopment.com/). For us, the `main` branch is
-the source of truth, and we're all focused on keeping it healthy and ready to go.
-
-Our day-to-day is pretty straightforward:
+The daily routine is simple:
 
 1.  Create a short-lived feature branch from `main`.
 2.  Write some code, then open a Pull Request (PR) back to `main`.
 3.  A GitHub Action automatically runs our test suite against the PR to catch issues early.
 
-We merge PRs all the time. But what about half-finished features? We rely heavily on flags to manage this. This lets us merge
-incomplete work into `main` safely, hiding it from users until it's ready. It's a great way to separate deploying code from
-releasing a feature.
+We merge PRs constantly, which raises an obvious question: what about features that aren't finished yet? For that we
+lean on flags. A flag lets us merge incomplete work into `main` and keep it hidden from users until it's ready. That
+way, deploying code and releasing a feature become two separate decisions.
 
-We generally use two types of flags. **Feature flags** are fine-grained and control a single, specific piece of functionality. A
-more coarse-grained type of flag we use is a **future flag**. These are used to control a whole set of features that might be
-part of a larger upcoming release. For example, a future flag like `v2_profile-matching` could hide all the work being done for
-a major v2.0 feature, allowing us to integrate code long before the big release day.
+We use two kinds of flags. A *feature flag* is small and controls one specific piece of functionality. A *future flag*
+is broader and controls a whole set of features that belong to a bigger upcoming release. For example, a future flag
+like `v2_profile-matching` could hide all the work for a major v2.0 feature, so we can keep merging that code long
+before release day.
 
-As soon as a PR is merged, our CI pipeline in TeamCity takes over. For every single commit to `main`, it automatically:
+Once a PR is merged, our CI pipeline in TeamCity picks it up. For every commit to `main`, it:
 
 1.  Lints and checks the formatting of the code.
 2.  Runs all our unit and end-to-end (e2e) tests.
 3.  Builds the application into a container image.
 4.  Pushes that new image to our container registry.
 
-From there, the image is auto-deployed to our `dev` and `int` (integration) environments. `dev` is our simple, no-fuss
-environment with mocked data, perfect for quick checks. `int` is where things get real, and the app has to prove it can play
-nicely with other live services.
+The new image is then deployed automatically to our `dev` and `int` (integration) environments. `dev` is the simple one.
+It uses mocked data and is good for quick checks. `int` is closer to the real thing: there, the app has to work with
+other live services.
 
-## The safety net: release branches for smooth landings
+## Release branches
 
-So, if `main` is always moving, how do we prepare for a big release? When a release is just a few days away, we create a
-`release/vX.Y.Z` branch. This branch is our "feature-freeze" zone.
+If `main` is always changing, how do we get something stable enough to release? A few days before a release, we create a
+`release/vX.Y.Z` branch. This is our feature freeze. The branch is a stable snapshot where we focus only on final
+testing and bug fixes. New development keeps going on `main`, but the release branch only gets small, critical fixes.
 
-Think of it as a stable snapshot where we can focus purely on final testing and bug fixes. While new development continues on
-`main`, the release branch only gets small, critical fixes.
+Pushing to a release branch triggers a separate TeamCity build. It runs the same tests, but it versions the container
+image as a release candidate (RC), like `v1.0.0-RC001`. That RC build is what our User Acceptance Testing (UAT) team
+reviews before giving final sign-off.
 
-Pushing to a release branch kicks off a special TeamCity build. It runs the same tests, but it versions the container image as a
-**Release Candidate (RC)**, like `v1.0.0-RC001`. This RC build is what our User Acceptance Testing (UAT) team reviews for the
-final sign-off.
+## Tagging and deploying with GitOps
 
-## The final mile: tagging and a GitOps hand-off
+Once UAT approves an RC, we're ready to go live:
 
-Once the UAT team gives the green light on an RC, we're ready to go live.
+1.  We tag the exact commit that UAT approved with the final version, like `v1.0.0`.
+2.  That tag triggers one last TeamCity build, which creates the official production image.
+3.  A developer updates a `deployments.yaml` file in our GitOps repo with the new version number.
 
-1.  **Tag it:** We tag the exact commit that UAT approved with the final version, like `v1.0.0`.
-2.  **Build it:** That tag triggers one last TeamCity build to create the official production image.
-3.  **Ship it (with GitOps):** For the final step—getting our code to production—we turn to GitOps. The process is surprisingly
-    simple and incredibly safe. A developer just updates a `deployments.yaml` file in our GitOps repo with the new version
-    number.
+GitOps means production is described by files in a Git repository, and an automated agent makes the real environment
+match those files. In our case, the agent notices the change to `deployments.yaml`, pulls the new image, and rolls out
+the update to production. Deploying is just a small, reviewed commit, so every production change has a clear record of
+who changed what and when.
 
-An automated agent spots the change, grabs the new image, and safely rolls out the update to production. It's a declarative,
-auditable, and stress-free way to deploy.
+## Merging back to `main`
 
-## Closing the loop: merging back to main
+We're not quite done once the code is in production. Any critical bug fixes made on the release branch also need to end
+up in `main`, or they'll be lost.
 
-The story doesn't end once the code is in production. What about the small, critical bug fixes that were made on the `release`
-branch? We need to make sure they aren't lost and are included in the next wave of development.
+So once the new version is live and stable, we open one more PR to merge the `release/vX.Y.Z` branch back into `main`.
+That brings any fixes made during the feature freeze back into our main line of development. The merge is usually
+smooth, but we don't skip it. If we did, the same bugs could come back in a future release.
 
-This is where the final step comes in: merging the release branch back into `main`.
+## Why it works for us
 
-Once the new version is live and confirmed to be stable, we open a final PR to merge the `release/vX.Y.Z` branch back into
-`main`. This ensures that any hotfixes applied during the feature-freeze are incorporated back into our primary line of
-development. Usually, this merge is smooth, but it's a critical step to prevent those same bugs from reappearing in a future
-release.
-
-## It just works
-
-So, what do we get from all this? Our trunk-based approach keeps us moving fast day-to-day. The release branches give us the
-breathing room we need to ship with confidence. And GitOps provides a rock-solid, auditable trail for every production
-deployment. It's a system that's worked well for us, giving us a great balance of developer velocity and production stability.
+Trunk-based development keeps us moving quickly day to day. Release branches give us room to test and fix things before
+we ship. GitOps gives us a clear, auditable record of every production deployment. Together they give us a good balance
+between shipping fast and keeping production stable.

@@ -6,29 +6,34 @@ date: 2025-09-05
 categories: react-router environment-variables
 ---
 
-Managing environment variables in a modern web application can be tricky. This post outlines a strategy for managing environment
-variables in a React Router v7 project, covering both server-side and client-side concerns.
+Environment variables look simple until your app has a server and a browser side and a dozen settings to juggle. This
+post walks through how we manage them in a React Router v7 project, on both the server and the client.
 
-## Guiding Principles
+## What we want
 
-A good environment variable strategy should be:
+We had four goals for our setup.
 
-- **Type-Safe:** Use a library like `valibot` to catch errors early.
-- **Secure:** Keep server-side and client-side variables separate to avoid exposing sensitive information.
-- **Organized:** Group variables by domain (e.g., `authentication`, `redis`, `session`) to keep things tidy.
-- **Centralized:** Access all variables through a single module for consistency.
+It should be type-safe. We validate everything with a library called `valibot`, so a missing or malformed variable
+fails fast at startup instead of somewhere deep in a request.
 
-## Server-Side Environment Variables
+It should keep secrets on the server. Server-side and client-side variables are kept separate so nothing sensitive ends
+up in the browser.
 
-On the server, we can keep all our environment variable logic in an `app/.server/environment/` directory.
+It should be organized. Variables are grouped by area, like `authentication`, `redis`, or `session`.
 
-### Modular Structure
+It should have one entry point. All code reads variables through a single module, so there's one way to do it.
 
-Inside this directory, we can create modules for each part of our application's configuration. For example,
-`app/.server/environment/authentication.ts` can define all the environment variables related to authentication.
+## Server-side variables
 
-Each module exports a `valibot` schema that defines the shape of its environment variables, including their types, default
-values, and any validation rules.
+On the server, all the environment variable code lives in an `app/.server/environment/` directory.
+
+### One module per area
+
+Inside that directory there's a module for each part of the app's configuration. For example,
+`app/.server/environment/authentication.ts` holds everything related to authentication.
+
+Each module exports a `valibot` schema. The schema describes that area's variables: their types, their default values,
+and any validation rules.
 
 Here's what `app/.server/environment/authentication.ts` might look like:
 
@@ -54,18 +59,18 @@ export const authentication = v.object({
 });
 ```
 
-### Centralized Schema
+### Combining the schemas
 
-The `app/.server/environment/server.ts` file imports all the modular schemas and combines them into a single `server` schema.
-This gives us a complete picture of all the environment variables used by our application on the server.
+`app/.server/environment/server.ts` imports all of those module schemas and combines them into one `server` schema. That
+gives us a single place to see every environment variable the server uses.
 
-### Loading and Parsing
+### Loading and parsing
 
-The `app/.server/environment.ts` file is where everything comes together. It imports the `server` schema and uses it to parse
-the `process.env` object. The parsed and validated environment variables are then exported as the `serverEnvironment` object.
+`app/.server/environment.ts` is where it all comes together. It parses `process.env` against the `server` schema and
+exports the validated result as `serverEnvironment`.
 
-This file also exports a `clientEnvironment` object, which is a subset of the `serverEnvironment` that's safe to expose to the
-client.
+It also exports `clientEnvironment`, which holds only the values that are safe to send to the browser. Each object gets
+a `revision`, which is an MD5 hash of its contents. We'll use the client one later for caching.
 
 ```typescript
 import { createHash } from 'node:crypto';
@@ -101,8 +106,9 @@ export const serverEnvironment: ServerEnvironment & { revision: string } = {
 };
 ```
 
-The `preprocess` function transforms `process.env` by replacing empty strings with `undefined`. This is useful for handling
-optional environment variables that may not be set.
+Before parsing, `preprocess` goes through `process.env` and turns empty strings into `undefined`. That matters for
+optional variables. If someone sets `AUTH_SCOPES=` with nothing after it, we want the schema to treat it as "not set" and
+fall back to the default, not as an empty string.
 
 ```typescript
 /**
@@ -123,28 +129,27 @@ export function preprocess<K extends string | number | symbol, T>(data: Record<K
 }
 ```
 
-### Security
+### Keeping secrets out of logs
 
-To prevent sensitive information from being accidentally leaked, we can use a `Redacted` transform in our `valibot` schemas.
-This transform wraps sensitive values in a special object that prevents them from being serialized to JSON. We use this for
-values like `AZUREAD_CLIENT_SECRET` in the `authentication.ts` module.
+Secrets can leak by accident, for example when someone logs the whole config object. To guard against that, we run
+sensitive values through a `Redacted` transform in the `valibot` schema. It wraps the value in a special object that
+won't serialize to JSON. You can see it on `AZUREAD_CLIENT_SECRET` in `authentication.ts` above.
 
-## Client-Side Environment Variables
+## Client-side variables
 
-Client-side environment variables need to be handled with care to ensure that no sensitive information is exposed to the
-browser.
+Anything the browser can see, users can see too. So we're careful about what goes to the client.
 
-### Defining Client-Safe Variables
+### Deciding what's safe
 
-The `app/.server/environment/client.ts` file defines a `valibot` schema for environment variables that are safe to expose to the
-client. This schema only includes non-sensitive information, such as build details and feature flags.
+`app/.server/environment/client.ts` defines a separate `valibot` schema for variables that are safe to expose. It only
+contains non-sensitive things like build details and feature flags.
 
-### Exposing Variables via an API Endpoint
+### Serving them from an endpoint
 
-Instead of bundling client-side environment variables directly into the client-side code, we expose them via an API endpoint at
+We don't bake client variables into the JavaScript bundle. Instead, we serve them from an API endpoint at
 `/api/client-env`.
 
-When the application loads, the `root.tsx` component renders a `<script>` tag that points to this endpoint.
+`root.tsx` renders a `<script>` tag that points at that endpoint, so the variables load with the page:
 
 ```tsx
 // app/root.tsx
@@ -170,10 +175,11 @@ export default function App({ loaderData }: Route.ComponentProps) {
 }
 ```
 
-The `v` query parameter is set to the `clientEnvRevision`, a hash of the client environment variables, for cache busting.
+The `v` query parameter is `clientEnvRevision`, the hash of the client variables. When the variables change, the hash
+changes, so the URL changes too. That's how we bust the browser cache.
 
-The `app/routes/api/client-env.ts` file handles requests to this endpoint. It returns a JavaScript file that creates a
-`globalThis.__appEnvironment` object containing the client-side environment variables.
+`app/routes/api/client-env.ts` handles the request. It returns a small JavaScript file that sets
+`globalThis.__appEnvironment` to the client variables.
 
 ```typescript
 // app/routes/api/client-env.ts
@@ -200,31 +206,30 @@ export function loader({ request }: Route.LoaderArgs) {
 
 ### Caching
 
-The response from the `/api/client-env` endpoint is aggressively cached by the browser. The `Cache-Control` header is set to
-`max-age=31536000, immutable` (1 year) when the requested revision matches the current build revision. This ensures that the
-client always has the correct environment variables without needing to re-fetch them on every page load.
+The browser caches the `/api/client-env` response hard. When the request has a revision in `v`, the response gets
+`Cache-Control: max-age=31536000, immutable`, which means one year. If `v` is missing, or is just the default
+`BUILD_REVISION`, the response is sent with `no-cache` instead.
 
-## How to Add a New Environment Variable
+Caching for a year is safe here because the URL includes the hash. If the variables change, the page asks for a new URL
+and the browser fetches it fresh. If they don't change, the browser never has to download them again.
 
-### Server-Side Variable
+## Adding a new variable
 
-1.  **Choose the right module:** Find the right module in `app/.server/environment/` for the new variable. If you can't find a
-    good fit, create a new one.
-2.  **Add to the schema:** Add the new variable to the `valibot` schema in the module you chose, specifying its type, default
-    value, and any validation rules.
-3.  **Add to defaults:** Add the default value to the `defaults` object in the same file.
-4.  **Use the variable:** The new variable can now be accessed from the `serverEnvironment` object imported from
-    `~/.server/environment`.
+### On the server
 
-### Client-Side Variable
+1. Pick the module in `app/.server/environment/` that fits the new variable. If none of them fit, create a new one.
+2. Add the variable to that module's `valibot` schema, with its type, default value, and any validation rules.
+3. Add its default value to the `defaults` object in the same file.
+4. Use it. It's now available on the `serverEnvironment` object you import from `~/.server/environment`.
 
-1.  **Add to the client schema:** Add the new variable to the `valibot` schema in `app/.server/environment/client.ts`.
-2.  **Add to defaults:** Add the default value to the `defaults` object in the same file.
-3.  **Use the variable:** The new variable will be automatically included in the `globalThis.__appEnvironment` object on the
-    client side.
+### On the client
 
-## Conclusion
+1. Add the variable to the `valibot` schema in `app/.server/environment/client.ts`.
+2. Add its default value to the `defaults` object in the same file.
+3. Use it. It's automatically included in `globalThis.__appEnvironment` in the browser.
 
-This approach to environment variable management provides a solid foundation for building secure and maintainable applications.
-By using `valibot` for schema validation and keeping a strict separation between server-side and client-side variables, you can
-be confident that your application is configured correctly and securely.
+## Wrapping up
+
+This setup gives us a solid base for secure, maintainable apps. Validating with `valibot` and keeping server
+and client variables strictly apart means we can trust that the app is configured correctly, and that secrets stay on
+the server.

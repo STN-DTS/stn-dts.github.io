@@ -6,27 +6,24 @@ date: 2025-09-26
 categories: spring-boot java backend
 ---
 
-As software engineers, we strive to write code that is clean, maintainable, and
-scalable. A key principle to achieve this is loose coupling: reducing the
-dependencies between different parts of our system. In a Spring Boot
-application, one of the most powerful tools for decoupling is the application
-event system.
+We all want code that's easy to change and keeps working as the app grows. One way to get there is *loose coupling*:
+keeping the parts of the system from depending on each other more than they need to. In a Spring Boot app, the built-in
+application event system is one of the best tools for this.
 
-When you combine events with asynchronous execution, you can unlock significant
-improvements in performance and responsiveness. Let's dive into how you can use
-this pattern to decouple components, illustrated with a common use case:
-handling tasks after a new user profile is created.
+If you also run those events asynchronously (in the background, on another thread), you can make your API respond faster
+too. In this post I'll show how, using a common example: the work that needs to happen after a new user profile is
+created.
 
-## The problem: tightly coupled logic
+## The problem
 
-Imagine a `ProfileService` that creates a user profile. After saving the new
-profile to the database, it needs to perform several other tasks:
+Say we have a `ProfileService` that creates user profiles. After it saves a new profile to the database, it also has to:
+
 - Log an audit event.
 - Send a welcome email.
 - Update a search index.
 - Notify other internal systems.
 
-A naive implementation might look like this:
+The first version usually looks something like this:
 
 ```java
 @Service
@@ -50,36 +47,23 @@ public class ProfileService {
 }
 ```
 
-This approach has several drawbacks:
-- **Violation of single responsibility principle:**
-  The `createProfile` method is doing more than just creating a profile.
-- **Brittleness:**
-  A failure in any of the secondary tasks (like sending an email) could cause
-  the entire operation to fail.
-- **Poor performance:**
-  If sending an email is slow, it will delay the HTTP response to the user who
-  just created their profile. The user is stuck waiting for tasks they don't
-  need to be aware of.
+This works, but it has a few problems. The `createProfile` method is supposed to create a profile, and now it's also
+responsible for auditing, email, and search. That breaks the single responsibility principle (the idea that each class
+or method should have one job). It's also fragile: if any of the extra tasks fails, like sending the email, the whole
+operation can fail with it. And it's slow. If sending an email takes a while, the user who just created their profile
+waits for it before they get a response, even though they don't care about any of this extra work.
 
-## The solution: application events
+## Using application events
 
-Spring's application event mechanism, based on the Observer pattern, allows us
-to decouple the primary action (creating a profile) from the secondary actions
-(auditing, sending emails).
+Spring's application events are based on the Observer pattern. One component, the *publisher*, announces that something
+happened. Any number of other components, the *listeners*, get notified and react to it. The publisher doesn't know or
+care who's listening. That's what lets us separate the main action (creating a profile) from the side tasks (auditing,
+sending emails, and so on).
 
-The flow is simple:
-1. A component (the **publisher**) publishes an event.
-2. One or more other components (the **listeners**) are notified and react to
-   that event.
+### Step 1: create an event
 
-Crucially, the publisher doesn't know or care who is listening. It just
-announces that something happened.
-
-### Step 1: create a custom event
-
-An event is a simple class that holds the data relevant to what happened. It's
-good practice to make these immutable. Using a Java `record` is perfect for
-this.
+An event is a small class that holds the data about what happened. It's a good idea to make events immutable (they can't
+be changed after they're created), and a Java `record` is a simple way to do that.
 
 ```java
 // ProfileCreateEvent.java
@@ -97,12 +81,11 @@ public record ProfileCreateEvent(ProfileEntity entity, Instant timestamp) {
 }
 ```
 
-This event captures the newly created `ProfileEntity` and a timestamp.
+This event holds the newly created `ProfileEntity` and a timestamp.
 
 ### Step 2: publish the event
 
-In our `ProfileService`, we inject Spring's `ApplicationEventPublisher` and use
-it to publish our new event.
+In `ProfileService`, we inject Spring's `ApplicationEventPublisher` and use it to publish the event.
 
 ```java
 // ProfileService.java
@@ -132,13 +115,12 @@ public class ProfileService {
 }
 ```
 
-Our service is now much cleaner. Its sole responsibility is to handle the
-profile creation logic.
+The service is much simpler now. Its only job is creating the profile.
 
 ### Step 3: create listeners
 
-Now, we create separate components that listen for the `ProfileCreateEvent`. A
-listener is just a Spring bean with a method annotated with `@EventListener`.
+Next, we write the components that react to `ProfileCreateEvent`. A listener is just a Spring bean with a method
+annotated with `@EventListener`.
 
 ```java
 // ProfileEventListener.java
@@ -165,20 +147,18 @@ public class ProfileEventListener {
 }
 ```
 
-We can have multiple listeners for the same event, each handling a different
-concern. This is a huge win for separation of concerns.
+You can have as many listeners for the same event as you like, and each one handles a single concern. Auditing code
+lives in one place, email code in another, and neither one is mixed into the profile service.
 
-### Step 4: making it asynchronous
+### Step 4: make it asynchronous
 
-By default, Spring event listeners run **synchronously** in the same thread as
-the publisher. This means our `ProfileService` will still wait for all listeners
-to finish before returning. We haven't solved the performance problem yet.
+There's a catch. By default, Spring runs event listeners **synchronously**, on the same thread as the publisher. So
+`ProfileService` still waits for every listener to finish before it returns, and we haven't fixed the slow response yet.
 
-To fix this, we can make our listeners asynchronous with two simple annotations:
+To run the listeners in the background, we need two annotations:
 
 1. **`@EnableAsync`:**
-   Add this to a configuration class to enable asynchronous processing in your
-   application.
+   Add this to a configuration class to turn on asynchronous processing in your application.
 
     ```java
     // AsyncConfig.java
@@ -213,35 +193,27 @@ To fix this, we can make our listeners asynchronous with two simple annotations:
     }
     ```
 
-Now, when `ProfileService` publishes an event, Spring will submit the listener
-methods to a background thread pool for execution. The `createProfile` method
-will return immediately without waiting, making your API feel much faster.
+Now when `ProfileService` publishes an event, Spring hands the listener methods to a background thread pool to run.
+`createProfile` returns right away without waiting for them, so the API responds faster.
 
-## Benefits of asynchronous events
+## What we get out of it
 
-1. **Decoupling:**
-   The `ProfileService` has no knowledge of the auditing or notification logic.
-   You can add, remove, or change listeners without ever touching the service
-   class.
-1. **Improved performance & responsiveness:**
-   The main thread is freed up immediately, leading to faster API response
-   times.
-1. **Resilience:**
-   By default, an exception in one `@Async` listener will not affect the
-   publisher or other listeners.
-1. **Scalability:**
-   You can configure a dedicated thread pool for your async tasks to handle high
-   loads without impacting the main application threads.
-1. **Testability:**
-   You can test the `ProfileService` and its listeners in isolation, verifying
-   that the service publishes the correct event and that the listeners react to
-   it appropriately.
+`ProfileService` no longer knows anything about auditing or notifications. We can add, remove, or change listeners
+without touching the service class.
 
-## Conclusion
+The request thread is freed up right away, so API responses come back sooner.
 
-Spring's asynchronous event system is a powerful pattern for building clean,
-decoupled, and high-performance applications. By separating the "what happened"
-from the "what to do when it happens," you create a more maintainable and
-scalable architecture. The next time you find a service method getting bloated
-with secondary responsibilities, consider if an application event might be a
-better approach.
+Failures are contained. By default, an exception in one `@Async` listener won't affect the publisher or the other
+listeners.
+
+It can scale. You can configure a dedicated thread pool for async tasks, so heavy load on them doesn't eat into the
+threads the rest of the app is using.
+
+It's easier to test. You can test `ProfileService` and each listener on their own: check that the service publishes the
+right event, and that each listener does the right thing when it receives one.
+
+## Wrapping up
+
+Asynchronous events in Spring are a good way to keep your services small and your API fast. You separate "what happened"
+from "what to do about it," and the code gets easier to maintain as it grows. The next time a service method starts
+picking up a pile of side tasks, think about whether an application event would be a better fit.

@@ -6,22 +6,17 @@ date: 2025-09-05
 categories: react-router server
 ---
 
-This document provides a comprehensive guide for creating a custom Express server tailored for a React Router v7 application. It
-delves into a specific implementation that leverages TypeScript, with the server-side code thoughtfully organized within the
-`app/.server/` directory.
+React Router v7 ships with its own server, and for a lot of apps that's all you need. We wanted more control, though. We
+wanted to decide exactly how each request is handled, and we wanted to plug in our own Express middleware for things like
+logging, security headers and sessions. (Middleware is a function that runs on every request before your app's code does.)
 
-A custom server offers significant advantages beyond what the built-in React Router v7 server can provide. These benefits
-include:
+So we wrote our own Express server. This post walks through how ours is put together. It's written in TypeScript, and all
+of the server code lives in the `app/.server/` directory.
 
-*   **Enhanced Control:** Fine-grained control over request handling, routing, and responses.
-*   **Custom Middleware:** The ability to integrate custom middleware for tasks like logging, security, session management, and
-    more.
+## Project layout
 
-## Project Structure
-
-A well-organized project structure is crucial for maintainability and scalability. While there's no single "correct" way, a good
-practice is to separate server-side code from client-side code. In this guide, we follow a convention where the server-side code
-is organized within an `app/.server/` directory, structured as follows:
+There's no single right way to lay this out, but we like keeping server code apart from client code. Everything for the
+server lives under `app/.server/`:
 
 ```
 app/
@@ -36,23 +31,20 @@ app/
     └── ... (other server-related files like environment configurations, logging utilities, etc.)
 ```
 
-Let's break down the purpose of each key directory and file within this structure:
-*   `app/.server/express/`: This directory serves as the central hub for the Express server implementation, encapsulating all
-    server-specific logic.
-*   `app/.server/express/assets/`: This subdirectory is designated for static assets that the server might need to serve
-    directly, such as custom error pages.
-*   `app/.server/express/handlers.ts`: This file is responsible for defining various request handlers and error handling logic,
-    acting as the bridge between incoming requests and your application's responses.
-*   `app/.server/express/middleware.ts`: Here, you'll find the implementations of custom Express middleware functions that can
-    be applied globally or to specific routes to add functionality like authentication, logging, or security headers.
-*   `app/.server/express/server.ts`: This is the main entry point for your custom Express server, where the Express application
-    is initialized, middleware is applied, and the server is started.
+Here's what each piece does:
 
-## Server Configuration
+*   `app/.server/express/` holds the whole Express server.
+*   `app/.server/express/assets/` holds static files the server sends directly, like our custom error pages.
+*   `app/.server/express/handlers.ts` defines the request handlers and the error handling. It's the bridge between an
+    incoming request and the response your app sends back.
+*   `app/.server/express/middleware.ts` holds our custom Express middleware, for things like logging and security headers.
+*   `app/.server/express/server.ts` is the entry point. It creates the Express app, applies the middleware and starts the
+    server.
 
-The server is built using Vite, a fast and opinionated build tool. A separate configuration file, `vite.server.config.ts`, is
-used to specifically configure the server build process. This separation ensures that the client-side and server-side builds are
-optimized independently.
+## Building the server with Vite
+
+We build the server with Vite. It has its own config file, `vite.server.config.ts`, separate from the client config, so
+each build can be tuned on its own.
 
 ```typescript
 import type { Plugin } from 'vite';
@@ -141,26 +133,21 @@ export function preserveImportMetaUrl(): Plugin {
 }
 ```
 
-This configuration instructs Vite to build the server in SSR mode, with `app/.server/express/server.ts` as one of the entry
-points. It also ensures that static assets, such as custom error pages, are copied to the build output.
+This tells Vite to build in SSR (server-side rendering) mode, with `app/.server/express/server.ts` as one of the entry
+points. It also copies static assets, like the error pages, into the build output.
 
-## Building the Application
+## Building the application
 
-This custom Express server implementation involves two distinct build processes: one for the client-side application and another
-for the server-side components. This separation allows for independent optimization and deployment of each part.
+There are two builds: one for the client-side app and one for the server. In our `package.json` they're called
+`build:application` and `build:server`.
 
-To build the entire application, you would typically execute two commands. In this example, these are defined in `package.json`
-as `build:application` and `build:server`.
+`build:application` builds the React app that runs in the browser. It compiles your components, TypeScript and CSS into
+bundles the browser can load, and usually minifies them along the way.
 
-*   **`build:application`**: This command is responsible for building the client-side React application. It compiles your React
-    components, JavaScript, CSS, and other assets into optimized bundles that can be served to the user's browser. This process
-    often includes transpilation (e.g., TypeScript to JavaScript), minification, and asset optimization.
+`build:server` builds the Express server. It compiles the TypeScript server code into JavaScript that Node.js can run, and
+copies over any static files the server needs, like our error pages.
 
-*   **`build:server`**: This command focuses on building the server-side Express application. It compiles the TypeScript server
-    code into JavaScript, preparing it for execution in a Node.js environment. This build might also include bundling
-    server-side dependencies and copying necessary static assets (like our error pages) that the server will directly serve.
-
-You can run these commands individually, or often, a main `build` script orchestrates both:
+You can run them one at a time, but it's easier to have a `build` script that runs both:
 
 ```json
 "scripts": {
@@ -170,14 +157,12 @@ You can run these commands individually, or often, a main `build` script orchest
 }
 ```
 
-After running the `build` command, you will typically find the compiled client-side assets in a directory like `build/client/`
-and the server-side code in `build/server/`.
+When the build finishes, the client files end up in a folder like `build/client/` and the server code in `build/server/`.
 
-## The Express Server
+## The Express server
 
-The heart of the server-side application resides in the main server file, `app/.server/express/server.ts`. This file is
-responsible for initializing the Express application, configuring global settings, applying various middleware, and starting the
-server to listen for incoming requests.
+The main server file is `app/.server/express/server.ts`. It creates the Express app, sets a few global options, applies
+the middleware and starts listening for requests.
 
 ```typescript
 import compression from 'compression';
@@ -274,8 +259,8 @@ log.info('Listening on http://localhost:%s/', (server.address() as AddressInfo).
 
 ## Middleware
 
-Custom middleware functions are defined in `app/.server/express/middleware.ts`. These functions are designed to encapsulate
-specific functionalities that can be reused and applied to the Express application.
+Our custom middleware lives in `app/.server/express/middleware.ts`. Each function handles one job, so we can reuse it and
+apply it to the Express app where we need it.
 
 ```typescript
 import { trace } from '@opentelemetry/api';
@@ -485,10 +470,10 @@ export function tracing(): RequestHandler {
 }
 ```
 
-## Request and Error Handling
+## Request and error handling
 
-Request and error handling logic is centralized in `app/.server/express/handlers.ts`. This file defines how the server processes
-incoming requests and gracefully handles any errors that may occur during that process.
+Request handling and error handling both live in `app/.server/express/handlers.ts`. This file decides how the server
+processes a request and what happens when something goes wrong.
 
 ```typescript
 import { createRequestHandler } from '@react-router/express';
@@ -575,46 +560,43 @@ export function rrRequestHandler(viteDevServer?: ViteDevServer) {
 }
 ```
 
--   **`rrRequestHandler`**: This is the main request handler for the React application. It leverages `@react-router/express` to
-    facilitate server-side rendering, allowing your React components to be rendered into HTML on the server before being sent to
-    the client. This can significantly improve initial page load times and SEO.
--   **`globalErrorHandler`**: This is a crucial global error handler. If an unhandled error occurs anywhere in the Express
-    application, this middleware catches it. It's designed to send a static HTML error page (either `403.html` for forbidden
-    access or `500.html` for internal server errors) as the response, providing a more user-friendly experience than a generic
-    browser error.
+There are two handlers in there.
 
-## Static Error Pages
+`rrRequestHandler` is the main handler for the React app. It uses `@react-router/express` to render your React components
+to HTML on the server before sending the page to the browser. That can make the first page load faster and helps with SEO.
 
-When the underlying framework or your application code throws an error that is not explicitly caught, the `globalErrorHandler`
-steps in to serve a static error page. These pages are pre-built HTML files that provide a fallback for unexpected server-side
-issues.
+`globalErrorHandler` catches any error that nothing else in the Express app handled. Instead of letting the browser show
+its own generic error, it sends back one of our static HTML pages: `403.html` for forbidden requests, or `500.html` for
+internal server errors.
 
-In this example, these pages are located in `app/.server/express/assets/`:
-*   `403.html`: Served when the server responds with a `403 Forbidden` status code.
-*   `500.html`: Served for any other internal server errors, typically a `500 Internal Server Error`.
+## Static error pages
 
-This approach offers several advantages:
-*   **Improved User Experience:** Instead of a blank page or a cryptic error message, users see a branded and informative error
-    page.
-*   **Consistency:** Ensures a consistent look and feel for error messages across your application.
-*   **Simplicity:** These are static HTML files, making them robust and easy to serve even when the main application logic
-    fails.
+If the framework or your own code throws an error that nobody catches, `globalErrorHandler` serves a static error page.
+These are plain HTML files that act as a fallback when something unexpected breaks on the server.
 
-You can customize these HTML files to match your application's branding and provide helpful information to the user, such as
-contact details or suggestions for what to do next.
+They live in `app/.server/express/assets/`:
 
-## Running the Server
+*   `403.html` is sent when the server responds with `403 Forbidden`.
+*   `500.html` is sent for any other server error, usually `500 Internal Server Error`.
 
-Once your application is built (or during development), you'll need to run the server to handle requests. The approach to
-running the server differs between development and production environments.
+We like this approach for a few reasons. Users see a proper error page that looks like the rest of the app, instead of a
+blank screen or a cryptic message. And because the pages are plain static HTML, the server can still send them even when
+the main app code is what's failing.
 
-### Development Mode
+Feel free to edit these files to match your branding, and add anything helpful like contact details or what the user
+should try next.
 
-In development, it's highly beneficial to use a tool that automatically restarts your server when code changes are detected.
-`nodemon` is a popular choice for this purpose. It monitors your source files and, upon detecting changes, automatically
-restarts the Node.js process, saving you from manually stopping and starting the server.
+## Running the server
 
-To use `nodemon`, you typically define a script in your `package.json`:
+How you run the server depends on whether you're developing locally or running in production.
+
+### Development
+
+During development you want the server to restart on its own whenever you change the code. We use `nodemon` for this. It
+watches your source files and restarts the Node.js process when one of them changes, so you don't have to stop and start
+the server by hand.
+
+Add a script to `package.json`:
 
 ```json
 "scripts": {
@@ -622,8 +604,7 @@ To use `nodemon`, you typically define a script in your `package.json`:
 }
 ```
 
-This command tells `nodemon` to use a specific configuration file, `nodemon.json`, for its settings. A sample `nodemon.json`
-might look like this:
+This tells `nodemon` to read its settings from `nodemon.json`. Ours looks like this:
 
 ```json
 {
@@ -634,21 +615,20 @@ might look like this:
 }
 ```
 
-In this `nodemon.json`:
-*   `exec`: Specifies the command to execute your server. Here, `tsx` is used to directly run TypeScript files, and it points to
-    your server's entry point (`./app/.server/express/server.ts`). It also includes `--env-file-if-exists=./.env` to load
-    environment variables from a `.env` file and `--import ./app/.server/telemetry.ts` for telemetry setup.
-*   `ext`: Defines the file extensions `nodemon` should watch for changes (e.g., `ts` for TypeScript files).
-*   `watch`: An array of directories or files `nodemon` should monitor. This ensures that changes to your environment variables
-    (`.env`) or server-side TypeScript files trigger a restart.
+Here's what each setting does:
 
-### Production Mode
+*   `exec` is the command that starts the server. We use `tsx`, which runs TypeScript files directly, and point it at the
+    entry point (`./app/.server/express/server.ts`). The `--env-file-if-exists=./.env` flag loads environment variables
+    from a `.env` file if there is one, and `--import ./app/.server/telemetry.ts` loads our telemetry setup first.
+*   `ext` lists the file extensions to watch. Here that's just `ts`.
+*   `watch` lists the files and folders to watch. A change to `.env` or to any server TypeScript file triggers a restart.
 
-For production, you typically run the compiled JavaScript output directly using Node.js. This is because `nodemon`'s overhead is
-not desirable in a production environment, and you want to run the optimized, built version of your server.
+### Production
 
-Assuming you have already run your build command (e.g., `pnpm run build`), you can start the production server with a script
-like this in your `package.json`:
+In production we run the compiled JavaScript directly with Node.js. We don't want `nodemon`'s overhead there, and we want to
+run the optimized build, not the source.
+
+After you've run the build (for example `pnpm run build`), start the server with a script like this:
 
 ```json
 "scripts": {
@@ -656,22 +636,18 @@ like this in your `package.json`:
 }
 ```
 
-This command:
-*   `cross-env NODE_ENV=production`: Sets the `NODE_ENV` environment variable to `production`, which is crucial for many
-    libraries and frameworks to enable production-specific optimizations and behaviors.
-*   `node --import ./build/server/telemetry.js ./build/server/server.js`: Executes the compiled server entry point
-    (`./build/server/server.js`) using Node.js. The `--import` flag is used to pre-load the telemetry setup.
+Two things are going on in that command. `cross-env NODE_ENV=production` sets `NODE_ENV` to `production`. Many libraries
+and frameworks check this variable to turn on their production behavior and optimizations, so don't skip it. Then
+`node --import ./build/server/telemetry.js ./build/server/server.js` runs the compiled server entry point, using `--import`
+to load the telemetry setup first.
 
-This setup ensures that your server runs efficiently and reliably in a production environment.
+### Preview
 
-### Preview Mode
+Preview mode sits between development and a real deployment. It runs the production build on your own machine so you can
+check it before you ship it. It uses the same build output as production, but you can tweak a few settings for local
+testing, like secure cookies.
 
-Preview mode is a useful intermediate step between development and full production deployment. It allows you to test your
-optimized production build locally, ensuring everything works as expected before pushing to a live environment. This mode
-typically uses the same production build artifacts but might have slightly different environment configurations (e.g., for local
-testing of secure cookies).
-
-In your `package.json`, you might find a script similar to this:
+Our `preview` script looks like this:
 
 ```json
 "scripts": {
@@ -679,14 +655,14 @@ In your `package.json`, you might find a script similar to this:
 }
 ```
 
-This `preview` command:
-*   `pnpm run build`: Ensures that the latest production build of both the client and server is available.
-*   `cross-env NODE_ENV=production`: Sets the `NODE_ENV` to `production`, activating production optimizations.
-*   `SESSION_COOKIE_SECURE=false`: An example of a specific environment variable override for local preview, allowing testing of
-    features that might require secure cookies in production but need to be disabled for local HTTP testing.
-*   `node --env-file-if-exists=./.env --import ./build/server/telemetry.js ./build/server/server.js`: Executes the compiled
-    server, similar to the production `start` command, but with the added `--env-file-if-exists=./.env` to load local
+Step by step, it:
+
+*   runs `pnpm run build`, so you're testing the latest client and server build.
+*   sets `NODE_ENV` to `production` with `cross-env`, same as the `start` script.
+*   sets `SESSION_COOKIE_SECURE=false`. In production, session cookies should only be sent over HTTPS (that's what "secure"
+    means here). Locally you're on plain HTTP, so we turn that off.
+*   runs the compiled server just like `start` does, but also passes `--env-file-if-exists=./.env` to load your local
     environment variables.
 
-Preview mode is invaluable for catching issues that might only appear in a production-like environment, such as caching
-problems, minification errors, or environment-specific configuration issues, without the need for a full deployment.
+We use preview mode to catch problems that only show up in a production-like setup, like caching issues, minification
+bugs or config that differs between environments, without having to deploy anything.

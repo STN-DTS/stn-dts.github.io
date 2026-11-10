@@ -6,36 +6,29 @@ date: 2025-09-26
 categories: effect-ts msgraph typescript
 ---
 
-Interacting with external APIs is a cornerstone of modern software development.
-But it's often a messy affair, filled with the perils of network failures,
-unexpected payloads, and complex asynchronous logic. The Microsoft Graph API,
-while incredibly powerful, is no exception. It has its own set of rules, like
-batching limits and specific authentication flows.
+Calling an external API sounds simple until you have to deal with network failures, responses that don't look like you
+expected, and a pile of async code. The Microsoft Graph API (MSGraph) is no different. It has its own rules too, like
+limits on how many operations you can batch together and a specific way to authenticate.
 
-This is where Effect-TS comes in. Effect is a TypeScript library for building
-robust, type-safe, and composable applications. It replaces promises and
-`async/await` with a powerful new abstraction -- the `Effect` -- that turns side
-effects, like API calls, into first-class, testable values.
+We used Effect-TS to manage this. Effect is a TypeScript library that replaces promises and `async/await` with its own
+type called an `Effect`. An `Effect` is a description of some work, like an API call, that hasn't run yet. Because it's
+just a value, you can combine it with other effects, test it, and see in its type exactly what it returns and how it can
+fail.
 
-In this post, we'll walk through creating a simple, yet powerful, client for the
-MSGraph API using Effect-TS. We'll tackle authentication, data validation, and
-even the tricky business of batch processing, showing how Effect helps us manage
-complexity and write code that is both resilient and easy to understand.
+In this post I'll walk through a small MSGraph client built with Effect. It covers authentication, checking the shape of
+API responses, and batching, which is the trickiest part.
 
-## The foundation: schemas and errors
+## Schemas and errors
 
-Before we make our first API call, let's define the shape of the data we expect
-to receive and how we'll handle errors. This upfront investment in data modeling
-is a core tenet of writing reliable software.
+Before making any API calls, we define what data we expect back and what our errors look like.
 
-### Defining data structures with `effect/Schema`
+### Defining data with `effect/Schema`
 
-Effect's `Schema` module allows us to define parsers and validators for our data
-structures. If an API response doesn't match the schema we define, the operation
-will fail, preventing malformed data from propagating through our system.
+Effect's `Schema` module lets us describe the shape of our data and then parse and validate against it. If an API
+response doesn't match the schema, the operation fails right there, so bad data never makes it into the rest of the
+app.
 
-First, let's define a schema for a Microsoft Graph User. We only care about a
-few fields for our purposes.
+Here's a schema for an MSGraph user. We only need a few fields.
 
 ```typescript
 // src/msgraph/schemas.ts
@@ -50,8 +43,8 @@ export const MSGraphUser = Schema.Struct({
 export type MSGraphUser = Schema.Schema.Type<typeof MSGraphUser>;
 ```
 
-Next, we need a way to parse paginated responses, which are common in the Graph
-API. We can create a generic schema factory for this:
+The Graph API returns a lot of its lists in pages, so we also need a schema for a paginated response. Since the items
+in the page can be anything, we write a function that builds the schema for us:
 
 ```typescript
 // src/msgraph/schemas.ts
@@ -62,13 +55,12 @@ export const PagedResponse = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
   });
 ```
 
-This `PagedResponse` function takes another schema as input and produces a new
-schema for a paginated list of that type. We'll see it in action shortly.
+`PagedResponse` takes a schema for one item and returns a schema for a page of those items. We'll use it in a moment.
 
-### A custom error for our domain
+### A custom error type
 
-Instead of throwing generic errors, we can create a custom, structured error
-type for our client. Effect's `Data.TaggedError` makes this trivial.
+Instead of throwing generic errors, we give the client its own error type. Effect's `Data.TaggedError` makes this
+easy.
 
 ```typescript
 // src/msgraph/errors.ts
@@ -80,21 +72,18 @@ export class MSGraphError extends Data.TaggedError('@support/MSGraphError')<{
 }> {}
 ```
 
-By creating a tagged error, we can use Effect's powerful pattern matching
-capabilities to handle specific failures in our logic, making our error handling
-more precise and robust.
+A tagged error carries a label (the "tag", here `@support/MSGraphError`). Effect can match on that tag, so callers can
+handle this specific failure without catching everything else by accident.
 
 ## Building the client
 
-With our schemas and errors defined, we can start building the client functions.
-Each function will return an `Effect` that describes an interaction with the
-MSGraph API.
+Now we can write the client functions. Each one returns an `Effect` that describes a call to the MSGraph API.
 
 ### Authentication
 
-First, we need to get an access token. We'll use the OAuth client credentials
-flow. This involves sending a `POST` request with our application's credentials
-to the Microsoft identity platform.
+First we need an access token. We use the OAuth client credentials flow, which is the one meant for an app talking to
+an API on its own, with no user signing in. We send a `POST` request with the app's credentials to the Microsoft
+identity platform and get a token back.
 
 ```typescript
 // src/msgraph/client.ts
@@ -132,28 +121,23 @@ export const authenticate = (
   );
 ```
 
-Let's break this down. We use `Effect.gen` to write our logic in a clean,
-generator-based style that resembles `async/await`.
+`Effect.gen` lets us write this with generator functions (`function*` and `yield*`), which reads a lot like
+`async/await`. Here's what happens, step by step:
 
-1. We get the default `HttpClient` from the Effect context.
-1. We construct a `POST` request, using `HttpClientRequest.bodyUrlParams` to
-   correctly format the request body.
-1. We `execute` the request and then pipe the result through a series of
-   transformations.
-1. `filterStatusOk` ensures the effect will fail if the HTTP response status is
-   not in the 200-299 range.
-1. `schemaBodyJson(AccessTokenResponse)` attempts to parse the JSON response
-   body using the `AccessTokenResponse` schema we defined earlier. This is
-   where validation happens.
-1. `map` extracts the `access_token` from the parsed response.
-1. Finally, `mapError` wraps any potential failure in our custom
-   `MSGraphError`, providing clear, contextual error information.
+1. We get the default `HttpClient` from the Effect context. The context is where Effect keeps dependencies like this,
+   so we don't have to pass them around by hand.
+1. We build a `POST` request. `HttpClientRequest.bodyUrlParams` formats the body the way the token endpoint expects.
+1. We `execute` the request and pipe the result through a few steps.
+1. `filterStatusOk` makes the effect fail if the HTTP status isn't in the 200-299 range.
+1. `schemaBodyJson(AccessTokenResponse)` parses the JSON body with the `AccessTokenResponse` schema. This is where the
+   validation happens.
+1. `map` pulls the `access_token` out of the parsed response.
+1. `mapError` wraps any failure in our `MSGraphError`, with a message that says what we were trying to do.
 
 ### Fetching group members
 
-Now that we can authenticate, let's fetch the members of a group. The Graph API
-provides endpoints for getting both direct and transitive (nested) members. The
-logic is nearly identical for both.
+With a token in hand, we can fetch the members of a group. The Graph API has endpoints for direct members and for
+transitive (nested) members. The code is nearly the same for both, so here's the direct one.
 
 ```typescript
 // src/msgraph/client.ts
@@ -176,32 +160,25 @@ export const getDirectGroupMembers = (authToken: string, groupId: string) =>
   );
 ```
 
-Here, we use our generic `PagedResponse(MSGraphUser)` schema to parse the list
-of members. We then filter the result to ensure we only return actual user
-objects, as a group can also contain other entities like devices or service
-principals.
+We parse the list of members with `PagedResponse(MSGraphUser)`. Then we filter it so we only return users, because a
+group can also contain things like devices or service principals (app identities).
 
-#### A note on tradeoffs: pagination
+#### What about pagination?
 
-A key consideration when working with real-world APIs is handling pagination.
-For simplicity, this function uses the `$top=999` query parameter to fetch a
-large page of results. However, for groups with more than 999 members, this
-implementation is incomplete. A production-ready client would need to check for
-the `@odata.nextLink` property in the response and recursively fetch all pages.
-Effect provides powerful tools like `Effect.iterate` that could handle this
-elegantly, but it's a complexity we've chosen to omit here.
+To keep things simple, this function asks for a single large page with `$top=999`. That means it's incomplete for
+groups with more than 999 members. A production client would check the response for `@odata.nextLink` and keep fetching
+until there are no more pages. Effect has tools like `Effect.iterate` that would handle this nicely, but we left it out
+here.
 
-### Modifying group membership in bulk
+### Changing group membership in bulk
 
-The Graph API can be slow if you try to add or remove hundreds of users one by
-one. The correct approach is to batch operations. There are two common ways to
-do this: parallel requests and the JSON batching endpoint.
+Adding or removing hundreds of users one at a time is slow. It's better to batch the work, and there are two common ways
+to do it: send several requests in parallel, or use the JSON batching endpoint. We use one for each.
 
 #### Adding members with parallel requests
 
-To add members, we can use the `members@odata.bind` property in a `PATCH`
-request. The API allows up to 20 members to be added in a single request. We can
-split our user list into chunks of 20 and send all the requests in parallel.
+To add members, we send a `PATCH` request with the `members@odata.bind` property. The API lets you add up to 20 members
+in one request, so we split the user list into chunks of 20 and send all the requests in parallel.
 
 ```typescript
 // src/msgraph/client.ts
@@ -235,22 +212,17 @@ export const addMembersToGroup = (authToken: string, groupId: string, users: MSG
   );
 ```
 
-Here, we use `Chunk.chunksOf` from Effect's immutable data structures to split
-the users. Then, we map each chunk to an `Effect` that performs the API call.
-Finally, `Effect.all` runs all of these effects concurrently and waits for them
-all to complete successfully. If any single request fails, the entire operation
-fails.
+`Chunk` is one of Effect's immutable data structures, and `Chunk.chunksOf` splits the users into groups of 20. We turn
+each group into an `Effect` that makes the API call. `Effect.all` then runs them all concurrently and waits for every
+one to succeed. If any single request fails, the whole operation fails.
 
 #### Removing members with JSON batching
 
-For removing members, we'll use the `$batch` endpoint. This allows us to package
-up to 20 individual `DELETE` operations into a single `POST` request. This is
-the most efficient way to perform a large number of deletions.
+To remove members, we use the `$batch` endpoint. It lets us bundle up to 20 separate `DELETE` operations into one
+`POST` request, which is the most efficient way to do a lot of deletions.
 
-Handling the response from the `$batch` endpoint is tricky. The main request can
-succeed with a `200 OK` status, but individual operations *within* the batch can
-fail. We must inspect the body of the response to know if the entire operation
-was a success.
+The tricky part is the response. The batch request itself can come back `200 OK` even when some of the operations
+*inside* it failed. So we have to look at the response body to know whether everything actually worked.
 
 ```typescript
 // src/msgraph/client.ts
@@ -290,24 +262,16 @@ export const removeMembersFromGroup = (authToken: string, groupId: string, users
   );
 ```
 
-This is the most complex function, but it showcases Effect's power. After
-parsing the batch response, we have a crucial `flatMap`. We check if any of the
-inner responses have a failure status code. If they do, we explicitly fail the
-`Effect` with `Effect.fail`. If not, we succeed with `Effect.void`. This gives
-us a guarantee that if the `removeMembersFromGroup` effect succeeds, all users
-were removed successfully.
+This is the most involved function, and it's where Effect earns its keep. The important bit is the last `flatMap`,
+after we parse the batch response. It checks whether any of the inner responses has an error status (400 or higher).
+If one does, we fail the effect on purpose with `Effect.fail`. If not, we succeed with `Effect.void`. So if
+`removeMembersFromGroup` succeeds, we know every user was actually removed.
 
-## Conclusion
+## Wrapping up
 
-We've built a small but powerful MSGraph client. By leveraging Effect-TS, we've
-created code that is not only functional but also robust, type-safe, and
-declarative. We've turned complex asynchronous operations, data validation, and
-error handling into manageable, composable pieces.
+That's a small MSGraph client. With Effect, the async calls, response validation, and error handling are all split into
+small pieces that fit together, and the types tell you what each piece returns and how it can fail.
 
-There is certainly a learning curve to Effect-TS. Thinking in terms of effects
-rather than promises requires a mental shift. However, as we've seen, the payoff
-is significant. For applications with complex asynchronous workflows, like our
-MSGraph client, Effect provides a solid foundation for building software that is
-easier to reason about, more resilient to failure, and ultimately more
-maintainable. The safety and clarity it brings to challenging topics like
-batching and error handling are well worth the investment.
+Effect does take some getting used to. Thinking in effects instead of promises is a real shift. But for code with a lot
+of async work, like this client, we think it's worth it. The code is easier to reason about, handles failure better,
+and is easier to maintain. That's especially true for the hard parts, like batching and error handling.

@@ -6,204 +6,129 @@ date: 2025-10-21
 categories: ci/cd github-actions monorepo devops
 ---
 
-This post explains how a repository-level GitHub workflow can detect changes in
-specific top-level folders and conditionally run jobs. It covers the
-implementation details, why this pattern is useful for monorepos, when to apply
-it, edge cases to watch out for, and alternative approaches.
+In a monorepo, every pull request kicks off every CI job by default. Change one line in the frontend and you still wait
+for the backend to compile and run its tests. In this post I'll show how we set up a GitHub Actions workflow that checks
+which top-level folders changed and only runs the jobs for those folders. I'll also cover when it's worth doing, a few
+gotchas, and some other ways to solve the same problem.
 
-## Workflow overview
+## How the workflow is set up
 
-The workflow uses a dedicated job called `detect-changes` that runs early and
-outputs boolean signals indicating whether any files under particular folder
-paths changed in the event that triggered the workflow. Downstream jobs
-reference these outputs in `if` conditions so they only run when needed.
+The workflow starts with a job called `detect-changes`. It checks whether any files changed under `backend/`,
+`frontend/`, and `gitops/`, and publishes the answer as three outputs: `backend-changed`, `frontend-changed`, and
+`gitops-changed`. (Job outputs are values one job can hand to the jobs that run after it.)
 
-Key pieces in the example workflow (see the sample workflow at the end of this
-post):
+The actual change detection is done by the `dorny/paths-filter@v3` action. Every other job looks at one of those
+outputs in an `if` condition, like `if: {% raw %}${{ needs.detect-changes.outputs.backend-changed == 'true' }}{% endraw %}`, and gets
+skipped if its folder didn't change.
 
-- `dorny/paths-filter@v3` action: used to check whether files changed under
-  `backend/`, `frontend/`, and `gitops/`.
-- `detect-changes` job outputs: the job exposes `backend-changed`,
-  `frontend-changed`, and `gitops-changed` outputs that other jobs use.
-- Conditional `if` checks on jobs: `if: {% raw %}${{
-  needs.detect-changes.outputs.backend-changed == 'true' }}{% endraw %}` ensures a job runs
-  only when the relevant folder changed.
+The full sample workflow is at the end of this post. It runs on `push` and `pull_request` for `main` and `release/**`
+branches, and you can also trigger it by hand. Change the event filters to fit your own branching and release setup.
 
-The example workflow (see the sample at the end of this post) runs on `push` and
-`pull_request` for `main` and `release/**` branches, and also supports manual
-triggers. You can adapt the event filters to match your project's branching and
-release model.
+## Step by step
 
-## How it works, step-by-step
+1. Check out the repo. The `detect-changes` job runs `actions/checkout@v4` to fetch the commits for the event. The
+   paths-filter action needs the repository contents to work out which files changed.
 
-1. checkout repository
+2. Run `paths-filter`. The job calls `dorny/paths-filter@v3` with one named filter per folder, each using a glob
+   pattern like `backend/**`. The action compares the current commits against the base branch (for pull requests) or
+   the previous commit (for pushes) and checks whether any matching files were added, modified, or deleted.
 
-   The `detect-changes` job runs `actions/checkout@v4` to fetch the commit(s)
-   for the event. This is necessary because the paths-filter action needs the
-   repository contents to determine which files were modified.
+3. Expose the outputs. The action sets an output for each named filter, for example `steps.paths.outputs.backend`.
+   It's `true` if something matched and `false` if not. The `detect-changes` job passes these on as its own outputs, so
+   any job that declares `needs: detect-changes` can read them.
 
-2. run `paths-filter` for each target folder
+4. Skip what didn't change. Jobs like `test-backend`, `build-backend`, `test-frontend`, and `build-frontend` declare
+   `needs: detect-changes` and use an `if` condition that checks the matching output. If it's `true`, the job runs.
+   Otherwise it's skipped.
 
-   The job calls `dorny/paths-filter@v3` with filters defined for each target
-   folder, using glob patterns like `backend/**`. When the action runs it
-   compares the current event's commit(s) against the base (for PRs) or previous
-   commit (for pushes) to decide whether any matching files were
-   added/modified/deleted.
+## Why bother
 
-3. expose outputs
+The main reason is cost. Compiling, testing, and building are the expensive parts of CI, and there's no point paying for
+them when the code they cover hasn't changed. It also means faster feedback: a pull request that only touches docs or
+one small part of the repo doesn't have to wait on unrelated jobs.
 
-   After running the filters the `detect-changes` job publishes outputs mapping
-   to each step's `steps.{id}.outputs.src` value. The `src` output is set to
-   `true` when matched and `false` otherwise. These outputs are available to
-   jobs that declare `needs: detect-changes`.
+It keeps things organized too. Each top-level folder can have its own CI jobs and build matrix, and they all share one
+place for change detection instead of each repeating it. This is a common pattern in monorepos that hold several
+services, SDKs, or components.
 
-4. downstream jobs use conditional `if`
+## When to use it
 
-   Jobs such as `test-backend`, `build-backend`, `test-frontend`,
-   `build-frontend`, etc. declare `needs: detect-changes` and supply an `if`
-   condition that checks the corresponding output. If the output is `true`, the
-   job runs; otherwise it is skipped.
+It's a good fit when your repo has several independent services or packages in separate folders, when builds or tests
+are slow enough that skipping them matters, or when you mix technologies (say a Java backend, a TypeScript frontend, and
+infrastructure manifests) and a change to one shouldn't trigger CI for the others.
 
-## Why use this pattern
+If your codebase is small and CI is already fast, the extra complexity probably isn't worth it.
 
-- save CI minutes and costs: only run expensive compilation, test, and build
-  steps when the code that matters actually changed.
-- faster feedback for developers: pull requests that touch only docs or a small
-  part of the repo don't block on unrelated jobs.
-- clear separation of concerns: each top-level folder can have its own CI logic
-  and matrix without duplicating the change-detection logic.
-- monorepo friendly: common pattern used in monorepos that contain multiple
-  services, SDKs, or components.
+## Branch protection and required checks
 
-## When to apply it
+This pattern plays nicely with branch protection rules. You can mark the conditional jobs as required status checks,
+and they'll only be enforced when they actually run.
 
-- monorepos with multiple independent services or packages in separate
-  directories.
-- projects where builds or tests are expensive and should only run when relevant
-  code changes.
-- mixed-technology repositories (Java backend, TypeScript frontend, infra
-  manifests) where selective runs reduce cross-impact.
+For example, say you require `ci/test-backend` and `ci/build-backend` to pass. If a pull request only changes frontend
+code, those backend jobs are skipped, and GitHub doesn't treat them as failing or blocking the merge. They show up as
+"skipped" in the pull request checks, not as failures. So you only run the checks you need, and the quality gates still
+apply to the parts that changed.
 
-If your repo has a small codebase with fast CI, the added complexity may not be
-worth it.
+To set up required checks, go to your repository's **Settings > Branches**, click **Add rule** (or edit the existing
+rule for your protected branch, e.g. `main`), and under **Require status checks to pass before merging**, add the names
+of the jobs you want to require. These need to match the job names in your workflow, such as `ci/test-backend`.
 
-## Branch Protections and Required Checks
+## Things to get right
 
-This pattern enables effective branch protections by allowing you to set
-required status checks that correspond to the conditional jobs. When configuring
-branch protections in your repository settings, you can specify that certain
-checks must pass before merging a pull request. Since the jobs only run when
-their respective folders have changes, the required checks are only enforced
-when relevant.
+**Fetch the full history.** Change-detection actions like `dorny/paths-filter` may need the full Git history to compute
+diffs correctly. Set `fetch-depth: 0` on `actions/checkout` to get it. The action's documentation has the details. If
+you use a shallow clone that doesn't include the previous commit, change detection can miss changes entirely. The
+sample workflow already sets `fetch-depth: 0` in `detect-changes`.
 
-For example, you can require "ci/test-backend" and "ci/build-backend" to pass.
-If a pull request only changes frontend code, these backend jobs will be
-skipped, and GitHub will not consider them as failing or blocking the merge. The
-pull request checks will show the skipped jobs, but they won't prevent merging.
-This ensures that only the necessary validations run, speeding up the process
-while maintaining quality gates for changed components.
+**Pull requests vs. pushes.** For pull requests, the action compares the PR branch to the base branch. For pushes, it
+compares the new commit to the previous one. `dorny/paths-filter` handles both cases for you, but keep in mind that
+merge commits and squash merges can affect what shows up in the diff.
 
-To configure required checks, navigate to your repository's Settings > Branches,
-select 'Add rule' or edit an existing one for your protected branch (eg:
-`main`), and under 'Require status checks to pass before merging,' add the names
-of the jobs you want to require (matching the job names in your workflow, such
-as `ci/test-backend`).
+**Be precise with globs.** `backend/**` matches everything under `backend/`. If you only care about changes under
+`backend/src`, use `backend/src/**` instead.
 
-Note that skipped jobs are displayed as "skipped" in the pull request status,
-not as failures, so they don't cause the PR to be blocked.
+**One invocation or several.** You can call `dorny/paths-filter` once per folder, each with a single filter, but the
+action also lets you define several named filters in one call. That's what the sample does. It means fewer steps, it's
+a little more efficient, and the outputs are cleaner.
 
-## Implementation notes and best practices
+**Outputs are strings.** The outputs from `dorny/paths-filter` are the strings `"true"` and `"false"`, not booleans.
+Your `if` conditions need to compare them as strings, e.g. `if: {% raw %}${{ needs.detect-changes.outputs.backend-changed == 'true' }}{% endraw %}`.
 
-- Checkout depth and fetch behavior: Change-detection actions like
-  `dorny/paths-filter` may require the full Git history to accurately compute
-  diffs. Use `fetch-depth: 0` in `actions/checkout` to fetch the complete
-  history. Refer to the action's documentation for specific requirements.
+**Don't forget `needs`.** A job has to declare `needs: detect-changes` to read its outputs.
 
-- PRs vs pushes: For pull requests, change detection compares the PR branch to
-  the base branch. For push events, it compares the new commit to the previous
-  one. `dorny/paths-filter` handles these cases automatically, but be mindful of
-  how merge commits or squash merges might influence the diffs.
+## Edge cases
 
-- Matching globs: Be precise with glob patterns. `backend/**` matches everything
-  under `backend/`. If you only want to detect changes to `src` subfolders,
-  narrow it to `backend/src/**`.
+If a pull request touches several folders, several outputs will be `true` and several sets of jobs will run. That's
+what you want, but it does mean one PR can still trigger a lot of jobs.
 
-- Multi-filter invocation vs single config: The example runs
-  `dorny/paths-filter` multiple times with a single `src` filter each time.
-  `dorny/paths-filter` also supports defining multiple filters in a single
-  invocation; using a single invocation with multiple named filters reduces the
-  number of steps and is slightly more efficient. The sample workflow below
-  demonstrates a single-invocation approach.
+Sometimes the changes that matter aren't in the folders you're watching. If your CI depends on shared build scripts or
+on the GitHub Actions workflow files themselves, add those paths to your filters. Another option is a separate
+`shared-changes` filter matching things like `.github/workflows/**` or `docker/*` that makes every job run when shared
+infrastructure changes.
 
-- Action outputs are strings: Outputs from `dorny/paths-filter` are string
-  values (`"true"` or `"false"`). Ensure your `if` conditions compare them as
-  strings, e.g., `if: {% raw %}${{ needs.detect-changes.outputs.backend-changed == 'true'
-  }}{% endraw %}`.
+Finally, `dorny/paths-filter` is well maintained, but it's still a third-party action. If you'd rather not depend on it,
+you can write the change detection yourself with `git diff` in a small script, or switch to a different action.
 
-- Job ordering and `needs`: Downstream jobs must declare `needs: detect-changes`
-  to access the outputs.
+## Other ways to do it
 
-## Edge cases and pitfalls
+GitHub Actions has built-in `paths` and `paths-ignore` filters for `push` and `pull_request` events, but they work at
+the workflow level. They decide whether the whole workflow runs, so you can't use them to turn individual jobs on and
+off from one shared detection step. They also can't express cross-folder logic as flexibly as a dedicated detection job.
 
-- Changes that cross folder boundaries: if a change touches multiple folders,
-  multiple outputs will be `true` and multiple jobs will run. That's expected,
-  but it means a single PR can still trigger many jobs.
+You can also skip third-party actions entirely and add a shell step that runs `git diff --name-only $BASE...$HEAD`,
+then sets outputs by writing to the `GITHUB_OUTPUT` file (e.g. `echo "changed=true" >> $GITHUB_OUTPUT`). That gives you
+full control over the logic.
 
-- Non-file changes that matter: some workflows want to trigger on changes to
-  external resources (e.g., changes to build scripts or GitHub Actions files).
-  If your CI depends on shared scripts, include those paths in the filters or
-  create a separate filter that causes all jobs to run when shared infra
-  changes.
+For larger JavaScript monorepos, tools like Nx or Lerna can work out which projects are affected by a change and give
+you a list of them. They go well beyond what a simple folder check can do.
 
-- False negatives because of shallow clones: if `actions/checkout` is configured
-  with a shallow fetch that doesn't include the previous commit, diff-based
-  detection may fail. Use `fetch-depth: 0` when necessary.
+## Wrapping up
 
-- Relying on `paths-filter` internals: while `dorny/paths-filter` is
-  well-maintained, it's a third-party action. You can reduce dependence by
-  re-implementing change detection using `git diff` in a small script or by
-  using a different action.
+A `detect-changes` job using `dorny/paths-filter`, plus `if` conditions on the other jobs, is a simple and easy to
+maintain way to run CI only for the parts of a monorepo that changed. It cuts CI costs and gets feedback to developers
+faster. For bigger or more specialized monorepos, you can pair it with monorepo tooling or a custom `git diff` script.
 
-## Alternatives
-
-- Native `paths` support on jobs: GitHub Actions supports `paths` and
-  `paths-ignore` filters at the workflow-level for `push` and `pull_request`
-  events, but these cannot conditionally run jobs inside a workflow based on
-  multiple folder checks with shared detection logic. `paths` also can't express
-  complex cross-folder logic as flexibly as an explicit detection job.
-
-- Custom git diff step: Run a shell step that computes `git diff --name-only
-  $BASE...$HEAD` and sets outputs using the `GITHUB_OUTPUT` environment file
-  (e.g., `echo "changed=true" >> $GITHUB_OUTPUT`). This avoids third-party
-  actions and can be tailored to your needs.
-
-- Third-party monorepo tools: tools like Nx or Lerna provide sophisticated
-  affected-project detection and can output lists of affected packages; they are
-  useful for larger JS monorepos.
-
-## Example changes to improve the sample workflow
-
-- Use a single `dorny/paths-filter` invocation with multiple named filters
-  instead of three separate steps. This simplifies the `detect-changes` job and
-  makes the outputs cleaner (the sample below shows this).
-
-- Add a `shared-changes` filter that matches `.github/workflows/**`, `docker/*`,
-  or other infrastructure when you want to run everything on infra changes.
-
-- Explicitly set `fetch-depth: 0` on `actions/checkout` in `detect-changes` to
-  avoid shallow clone pitfalls (the sample uses `fetch-depth: 0`).
-
-## Conclusion
-
-Using a `detect-changes` job with `dorny/paths-filter` and conditional `if`
-expressions provides a clear, maintainable way to run jobs only when relevant
-parts of a monorepo change. It reduces CI costs and shortens feedback loops
-while keeping the workflow flexible. For larger or more specialized monorepos,
-complement this approach with monorepo-aware tooling or a custom git-diff
-script.
-
-Below is a generic, self-contained example workflow you can copy into
-`.github/workflows/` or keep as a reference in the post.
+Here's a complete example workflow. You can copy it into `.github/workflows/` and adapt it to your repo.
 
 ```yaml
 {% raw %}

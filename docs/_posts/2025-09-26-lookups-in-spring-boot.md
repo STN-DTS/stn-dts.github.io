@@ -6,30 +6,22 @@ date: 2025-09-26
 categories: spring-boot java backend
 ---
 
-Managing lookup tables (or "code tables") is a common task in API development.
-These tables store values that rarely change, like statuses, types, or
-categories. While they may seem simple, handling them efficiently and cleanly is
-crucial for a maintainable and robust application.
+Most APIs have a few lookup tables, sometimes called *code tables*. They hold values that rarely change, like statuses,
+types, or categories. They look simple, but if you handle them carelessly you end up with magic strings scattered all
+over your business logic.
 
-In this post, we'll explore a powerful and elegant approach to managing lookup
-tables in a Spring Boot application, drawing inspiration from a real-world
-project. We'll see how to externalize codes to `application.yaml`, load them
-with `@ConfigurationProperties`, and use them in our services to interact with
-the database.
+In this post I'll show the approach we use in a real Spring Boot project. We put the codes in `application.yaml`, load
+them with `@ConfigurationProperties`, and use them in our services to look up the matching rows in the database.
 
-## The goal
+## What we want
 
-Our goal is to create a system where:
+We're aiming for three things. Lookup codes like "APPROVED" or "PENDING" shouldn't be hardcoded in business logic. We
+should be able to change them without touching Java code. And the result should be readable, type-safe, and easy to
+maintain.
 
-- Lookup codes (like "APPROVED", "PENDING", etc.) are not hardcoded in our business logic.
-- These codes are easily configurable without changing the Java code.
-- The code is readable, type-safe, and easy to maintain.
+Let's go through it from the database up to the service layer.
 
-## The solution
-
-Let's walk through the implementation, from the database to the service layer.
-
-### 1. The database and JPA entity
+## The database and JPA entity
 
 Our lookup tables are simple. For example, a `PROFILE_STATUS` table might look like this:
 
@@ -45,8 +37,8 @@ Our lookup tables are simple. For example, a `PROFILE_STATUS` table might look l
 
 </div>
 
-We represent this with a JPA entity. We can use a base class like
-`AbstractCodeEntity` to hold common fields.
+We map this to a JPA entity. Since every code table has the same basic columns, we put the shared fields in a base class
+called `AbstractCodeEntity`.
 
 ```java
 // AbstractCodeEntity.java
@@ -65,7 +57,7 @@ public abstract class AbstractCodeEntity {
 }
 ```
 
-And the specific entity for our profile statuses:
+Then the entity for profile statuses just extends it:
 
 ```java
 // ProfileStatusEntity.java
@@ -76,10 +68,10 @@ public class ProfileStatusEntity extends AbstractCodeEntity {
 }
 ```
 
-### 2. Externalize codes in `application.yaml`
+## Putting the codes in `application.yaml`
 
-Instead of hardcoding strings like "APPROVED" in our code, we'll define them in
-`application.yaml`. This makes them easy to find and change.
+Instead of hardcoding strings like "APPROVED" in the Java code, we define them in `application.yaml`. That puts them all
+in one place where they're easy to find and change.
 
 ```yaml
 # application.yaml
@@ -92,11 +84,11 @@ codes:
   # ... other lookup codes
 ```
 
-### 3. The `@ConfigurationProperties` class
+## Loading them with `@ConfigurationProperties`
 
-Now, we need a way to load these values into our Spring application. A
-`@ConfigurationProperties` class is perfect for this. We'll use a Java `record`
-for an immutable, concise representation.
+Next we need to get those values into the application. `@ConfigurationProperties` tells Spring to bind a section of the
+config file (here, everything under `codes`) to a Java object. We use a Java `record` so the object is immutable and
+short to write.
 
 ```java
 // LookupCodes.java
@@ -118,7 +110,11 @@ public record LookupCodes(
 }
 ```
 
-To make this work, we need to enable it in our main application class:
+The `@Validated` and `@NotBlank` annotations tell Spring to check these values when it loads the config. With a Bean
+Validation library on the classpath (such as `spring-boot-starter-validation`), the app fails at startup if a code is
+missing, instead of failing later at runtime.
+
+For Spring to pick up the class, we enable it in the main application class:
 
 ```java
 // Application.java
@@ -129,11 +125,10 @@ public class Application {
 }
 ```
 
-### 4. The repository
+## The repository
 
-We need a repository to fetch our lookup entities from the database. A simple
-Spring Data JPA repository will do. We can define a method to find a code entity
-by its `code` string.
+To fetch lookup entities from the database, a plain Spring Data JPA repository is enough. We add a method that finds an
+entity by its `code` string. Putting it in a shared base interface means every code table repository gets it for free.
 
 ```java
 // AbstractCodeRepository.java
@@ -147,13 +142,11 @@ public interface AbstractCodeRepository<T extends AbstractCodeEntity> extends Jp
 public interface ProfileStatusRepository extends AbstractCodeRepository<ProfileStatusEntity> {}
 ```
 
-### 5. The service layer: putting it all together
+## Using it in the service
 
-This is where the magic happens. Our `ProfileService` will inject both the
-`LookupCodes` and the `ProfileStatusRepository`.
-
-When we need to set a profile's status, we can use our `LookupCodes` object to
-get the code string, and the repository to fetch the corresponding entity.
+Now we can put the pieces together. `ProfileService` injects both `LookupCodes` and `ProfileStatusRepository`. When it
+needs to set a profile's status, it gets the code string from `LookupCodes`, then uses the repository to fetch the
+matching entity.
 
 ```java
 // ProfileService.java
@@ -190,25 +183,21 @@ public class ProfileService {
 }
 ```
 
-## Benefits of this approach
+## Why we like this
 
-- **Decoupling:**
-  The business logic in `ProfileService` is no longer coupled to the raw string
-  "INCOMPLETE". It uses a symbolic name (`profileStatuses.incomplete()`).
-- **Configuration over Code:**
-  If a status code ever needs to change (e.g., from "INCOMPLETE" to "DRAFT"),
-  you only need to update `application.yaml`. No Java code changes are required.
-- **Readability and Maintainability:**
-  The code is much cleaner and easier to understand. It's clear that we're
-  setting the profile to an "incomplete" status.
-- **Type Safety:**
-  Using a `record` for our configuration properties gives us compile-time safety
-  and autocompletion in our IDE.
+The business logic in `ProfileService` no longer depends on the raw string "INCOMPLETE". It uses a named accessor,
+`profileStatuses.incomplete()`, instead.
 
-## Conclusion
+If a status code ever has to change (say, from "INCOMPLETE" to "DRAFT"), you only update `application.yaml`. No Java
+code changes are needed.
 
-By combining the power of Spring Boot's `@ConfigurationProperties` with a clean
-service layer design, we can handle lookup tables in a way that is robust,
-maintainable, and a pleasure to work with. This approach keeps our code clean
-and our configuration externalized, leading to a more professional and scalable
-application.
+The code is easier to read. It's obvious that we're setting the profile to an "incomplete" status.
+
+It's also type-safe. Because the config is a `record`, you call methods like `profileStatuses.incomplete()` instead of
+passing strings around, so the compiler catches a mistyped method name and your IDE can autocomplete them.
+
+## Wrapping up
+
+Pairing `@ConfigurationProperties` with a simple service layer is a tidy way to handle lookup tables in Spring Boot. The
+codes live in configuration instead of being scattered through the code, and the services that use them stay short and
+easy to follow.

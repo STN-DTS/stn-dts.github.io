@@ -6,29 +6,20 @@ date: 2025-11-05
 categories: spring-boot podman containers java
 ---
 
-## Introduction
+Spring Boot can turn your app into a container image for you with the `spring-boot:build-image` Maven goal (or
+`bootBuildImage` in Gradle). Out of the box it expects Docker. If you'd rather use Podman, it works fine, but you need to
+set up three things first. This post walks through them.
 
-Spring Boot provides excellent support for building container images using the
-`spring-boot:build-image` Maven goal. By default, this uses Docker, but you can
-also use Podman as an alternative container runtime. This post explains how to
-configure your Spring Boot project to build images with Podman instead of
-Docker.
+You'll need Podman installed and working. If you haven't used it before, Podman is a container engine that doesn't need
+a background daemon. It understands the same commands and image formats as Docker, so most Docker tooling can talk to it.
 
-## Prerequisites
+## 1. Let the builder reach the host
 
-Before building images with Podman, ensure you have Podman installed and
-configured on your system. Podman is a daemonless container engine that's
-compatible with Docker's CLI and image formats.
+Spring Boot builds the image with Paketo buildpacks, and the buildpack runs *inside* a container. That container needs to
+reach the Podman socket on your machine. To allow it, set `bindHostToBuilder` to `true` in the Spring Boot plugin
+config.
 
-## Configuration Steps
-
-### 1. Configure the Spring Boot Maven or Gradle plugin
-
-You need to configure the Spring Boot plugin to bind the host to the builder.
-This allows the build process (which runs inside a container) to access the
-Podman socket on the host.
-
-**Maven (`pom.xml`):**
+For Maven, in `pom.xml`:
 
 ```xml
 <plugin>
@@ -42,7 +33,7 @@ Podman socket on the host.
 </plugin>
 ```
 
-**Gradle (`build.gradle`):**
+For Gradle, in `build.gradle`:
 
 ```groovy
 tasks.named("bootBuildImage") {
@@ -52,64 +43,40 @@ tasks.named("bootBuildImage") {
 }
 ```
 
-Setting `bindHostToBuilder` to `true` enables the builder to access host
-resources, which is necessary when using Podman.
+## 2. Turn on the Podman socket
 
-### 2. Enable the Podman socket
-
-Podman uses a socket for communication, similar to Docker. You need to enable
-the user-level Podman socket service:
+Docker runs as a system-wide daemon that tools talk to through a socket file. Podman can run rootless (as your normal
+user, without root), so instead it gives each user their own socket. That socket is off by default. Turn it on with:
 
 ```bash
 systemctl --user enable --now podman.socket
 ```
 
-This command enables and starts the Podman socket service for your user session.
-The socket will be available at `/run/user/${UID}/podman/podman.sock` (where
-`1000` is typically your user ID).
+This starts the socket now and every time you log in. It lives at `/run/user/${UID}/podman/podman.sock`, where `${UID}`
+is your user ID (usually `1000`).
 
-### 3. Set the `DOCKER_HOST` environment variable
+## 3. Point the build at Podman
 
-Spring Boot's build-image goal expects to communicate with Docker, but you can
-point it to Podman by setting the `DOCKER_HOST` environment variable.
+The build-image goal talks to Docker, but it decides *where* Docker is by reading the `DOCKER_HOST` environment
+variable. Set that to the Podman socket and the build uses Podman instead.
 
-**Maven:**
+With Maven:
 
 ```bash
 DOCKER_HOST=unix:///run/user/${UID}/podman/podman.sock mvn spring-boot:build-image -Dmaven.test.skip=true
 ```
 
-**Gradle:**
+With Gradle:
 
 ```bash
 DOCKER_HOST=unix:///run/user/${UID}/podman/podman.sock ./gradlew bootBuildImage -x test
 ```
 
-This tells the build process to use the Podman socket instead of the default
-Docker socket. Skipping tests is optional but recommended for faster builds if
-you've already verified your code.
+Skipping the tests isn't required. It just makes the build faster if you've already run them.
 
-## Why these steps are necessary
+## Running the image
 
-- **bindHostToBuilder**: This configuration allows the Paketo buildpack (used by
-  Spring Boot) to access the host's container runtime socket during the build
-  process.
-
-- **Podman socket**: Unlike Docker, which runs as a system daemon, Podman can
-  run rootless and uses user-specific sockets. Enabling the socket allows the
-  build process to communicate with Podman.
-
-- **DOCKER_HOST**: Spring Boot's build-image goal is hardcoded to look for
-  Docker, but by setting this environment variable, we redirect it to use Podman
-  instead.
-
-## Building the image
-
-Once configured, you can build your Spring Boot application into a container
-image using the commands from Step 3.
-
-The resulting image will be built using Podman and stored in your local Podman
-registry. You can list it with:
+When the build finishes, the image is stored in Podman's local image storage. You can see it with:
 
 ```bash
 podman images
@@ -121,33 +88,29 @@ And run it with:
 podman run --interactive --rm --tty --network host your-app-name:latest
 ```
 
-## Troubleshooting & Tips
+## Troubleshooting and tips
 
-### SELinux on Fedora/RHEL
+### SELinux on Fedora or RHEL
 
-If you are running on an SELinux-enabled system (like Fedora or RHEL), you might
-encounter permission denied errors when the builder tries to access the socket.
-You may need to ensure the socket is labeled correctly or temporarily set
-SELinux to permissive mode to verify if it's the culprit.
+On systems with SELinux turned on, such as Fedora and RHEL, you might get "permission denied" errors when the builder
+tries to use the socket. You may need to make sure the socket has the right SELinux label. To check whether SELinux is
+the problem at all, you can temporarily switch it to permissive mode and try again.
 
-### Storage Driver Performance
+### Slow builds
 
-Podman works best with the `overlay` storage driver. If your builds are
-exceptionally slow, check your storage driver:
+Podman works best with the `overlay` storage driver. If your builds are very slow, check which driver you're using:
 
 ```bash
 podman info --format '{% raw %}{{.Store.GraphDriverName}}{% endraw %}'
 ```
 
-If it returns `vfs`, you should configure `fuse-overlayfs` for better
-performance.
+If it says `vfs`, set up `fuse-overlayfs` instead. It's much faster.
 
-### Customizing the Image Name
+### Changing the image name
 
-By default, the image name is derived from your project's artifact ID and
-version. You can customize this in your configuration:
+By default the image is named after your project's artifact ID and version. You can change that in the plugin config.
 
-**Maven:**
+Maven:
 
 ```xml
 <configuration>
@@ -160,7 +123,7 @@ version. You can customize this in your configuration:
 </configuration>
 ```
 
-**Gradle:**
+Gradle:
 
 ```groovy
 bootBuildImage {
@@ -171,17 +134,13 @@ bootBuildImage {
 }
 ```
 
-### Common Issues
+### Common errors
 
-1. **Socket not found**: Verify the socket path exists.
-2. **Permission denied**: Ensure your user has access to the socket.
-3. **Builder failure**: Run with `-X` (Maven) or `--debug` (Gradle) to see
-   detailed logs from the buildpack.
+If the build says the socket isn't found, check that the socket file actually exists at the path you gave in
+`DOCKER_HOST`. If you get "permission denied", make sure your user can access the socket. If the buildpack itself fails,
+run the build again with `-X` (Maven) or `--debug` (Gradle) to get detailed logs.
 
-## Conclusion
+## Wrapping up
 
-Using Podman with Spring Boot provides an alternative to Docker for building
-container images, especially in environments where running a Docker daemon isn't
-desirable. The configuration is straightforward and allows you to leverage
-Spring Boot's excellent container build support with Podman's daemonless
-architecture.
+That's all it takes. Once the socket is on and `DOCKER_HOST` points at it, Spring Boot's image building works the same
+with Podman as it does with Docker. It's a good option anywhere you don't want to run a Docker daemon.

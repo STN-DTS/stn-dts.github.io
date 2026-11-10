@@ -11,107 +11,94 @@ categories:
 - linux
 ---
 
-# Using k3d on Ubuntu 24.04 with rootless Podman
+k3d runs a Kubernetes cluster on your machine by starting k3s (a small Kubernetes distribution) inside containers. It's
+built for Docker, but it also works with rootless Podman, meaning Podman running as your normal user instead of root.
+On Ubuntu 24.04 you need to do a bit of setup first: let your user manage more cgroup resources, raise the kernel's
+file watcher limits, and turn on the Podman socket so k3d can talk to Podman as if it were Docker.
 
-k3d creates Kubernetes clusters using k3s in Docker containers. To use k3d with
-rootless Podman on Ubuntu 24.04, you must configure cgroup delegation, increase
-system file watcher limits, and enable the Podman socket for Docker API compatibility.
+## What you need
 
-## Prerequisites
+- Podman, set up to run rootless
+- k3d (you can install it with `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`)
+- kubectl, to work with the cluster once it's running
 
-Ensure the following are installed:
-- Podman configured for rootless operation
-- k3d (install via `curl -s
-  https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`)
-- kubectl (for interacting with the cluster)
+## 1. Let your user control CPU, cpuset, and I/O
 
-## Step 1: Enable cgroup `CPU`, `CPUSET`, and `I/O` delegation
+Linux uses cgroups (control groups) to limit how much CPU, memory, and so on a group of processes can use. By default,
+systemd only hands a few of these controls to regular users. Kubernetes needs more of them, so we have to tell systemd
+to delegate them to user sessions.
 
-Rootless Podman requires cgroup delegation to manage resources in user services.
-
-Create `/etc/systemd/system/user@.service.d/delegate.conf` (requires `sudo`)
-with:
+Create `/etc/systemd/system/user@.service.d/delegate.conf` (you'll need `sudo`) with this content:
 
 ```ini
 [Service]
 Delegate=cpu cpuset io memory pids
 ```
 
-After creating the file, reload the systemd configuration:
+Then reload systemd:
 
 ```bash
 sudo systemctl daemon-reload
 ```
 
-**Note:** You must log out and log back in (or reboot) for these changes to take
-effect for your user session.
+This doesn't apply to your current session. Log out and back in (or reboot) before going further.
 
-## Step 2: Enable Podman socket
+## 2. Turn on the Podman socket
 
-Enable the Podman socket to provide a Docker-compatible API for k3d.
-
-Run:
+k3d talks to its container engine through the Docker API. Podman can provide that same API through a socket, but it's
+off by default. Turn it on with:
 
 ```bash
 systemctl --user enable --now podman.socket
 ```
 
-## Step 3: Export socket locations
+## 3. Tell k3d where the socket is
 
-Set environment variables to direct k3d to the Podman socket. `DOCKER_HOST` is
-used by the k3d CLI to talk to the Podman socket, while `DOCKER_SOCK` is often
-used by scripts or tools that expect a direct path to the socket file.
-
-Export:
+Next, set two environment variables. The k3d CLI reads `DOCKER_HOST` to find the API. `DOCKER_SOCK` is the plain file
+path to the socket, which some scripts and tools expect instead.
 
 ```bash
 export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/podman/podman.sock"
 export DOCKER_SOCK=$XDG_RUNTIME_DIR/podman/podman.sock
 ```
 
-To set these variables automatically at login, add the export commands to your
-shell profile (e.g., `~/.bashrc` or `~/.zshrc`).
+These only last for the current shell. To have them set every time you log in, add both lines to your shell profile,
+such as `~/.bashrc` or `~/.zshrc`.
 
-## Step 4: Increase `inotify` resource limits
+## 4. Raise the `inotify` limits
 
-When running multiple Kubernetes nodes (like a server and multiple agents) as
-rootless containers on a single host, they aggressively consume the kernel's file
-watcher (`inotify`) resources. 
+`inotify` is the Linux feature that lets programs watch files for changes. Each Kubernetes node uses a lot of these
+watchers, and when you run several nodes (a server plus a few agents) as rootless containers on one machine, they all
+come out of the same per-user limit.
 
-If you leave the default limits in place, the Kubelet's `cAdvisor` will quickly
-hit a ceiling and silently crash (`inotify_init: too many open files`). Because 
-the agents fail to initialize, `k3d` will hang indefinitely while waiting for the 
-cluster to report a "Ready" status.
+With the default limits, the kubelet's `cAdvisor` (the part that collects container stats) quickly runs out and crashes
+with `inotify_init: too many open files`. It does this quietly. The agents never finish starting, and `k3d` just hangs
+forever waiting for the cluster to become "Ready". This one is easy to miss.
 
-To fix this permanently, increase the limits by creating `/etc/sysctl.d/99-k3d.conf`
-(requires `sudo`):
+To fix it for good, create `/etc/sysctl.d/99-k3d.conf` (again with `sudo`):
 
 ```ini
 fs.inotify.max_user_instances=8192
 fs.inotify.max_user_watches=524288
 ```
 
-Apply the new limits immediately without rebooting:
+Then apply the new limits right away, without rebooting:
 
 ```bash
 sudo sysctl -p /etc/sysctl.d/99-k3d.conf
 ```
 
-## Step 5: Create the k3d cluster
+## 5. Create the cluster
 
-Create the cluster with user namespace support for rootless Podman. The feature 
-gates ensure the Kubelet handles the User Namespace environment correctly without 
-crashing due to missing host-level privileges.
-
-Run:
+Now create the cluster. Rootless Podman runs everything inside a user namespace, where the kubelet doesn't have the
+host-level privileges it normally expects. The `KubeletInUserNamespace` feature gate tells the kubelet about this so it
+doesn't crash. We pass it to both the server and the agents:
 
 ```bash
 k3d cluster create --servers 1 --agents 3 --k3s-arg '--kubelet-arg=feature-gates=KubeletInUserNamespace=true@server:*' --k3s-arg '--kubelet-arg=feature-gates=KubeletInUserNamespace=true@agent:*'
 ```
 
-## Verification
-
-Verify the cluster:
+To check that it worked:
 
 ```bash
 k3d cluster list
@@ -120,28 +107,26 @@ kubectl get nodes
 
 ## Troubleshooting
 
-### AppArmor and User Namespaces
+### AppArmor and user namespaces
 
-Ubuntu 24.04 restricts unprivileged user namespaces, which can prevent rootless
-Podman from creating containers. If you encounter errors related to user
-namespaces, you may need to adjust the AppArmor configuration.
+Ubuntu 24.04 restricts unprivileged user namespaces, and that can stop rootless Podman from creating containers. If you
+see errors about user namespaces, AppArmor is the likely cause.
 
-A temporary workaround is to disable the restriction:
+As a temporary workaround, you can turn the restriction off:
 
 ```bash
 sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 ```
 
-For a permanent fix, ensure you are using a version of Podman that includes the
-necessary AppArmor profiles, or create a profile that allows `userns`.
+For a permanent fix, use a version of Podman that ships the AppArmor profiles it needs, or write a profile that allows
+`userns`.
 
-### Cgroup Version
+### cgroup version
 
-Ensure your system is using cgroup v2, which is the default on Ubuntu 24.04. You
-can verify this with:
+This setup needs cgroup v2. That's the default on Ubuntu 24.04, but you can check with:
 
 ```bash
 podman info | grep "cgroup version"
 ```
 
-It should output `cgroup version: v2`.
+You should see `cgroup version: v2`.
