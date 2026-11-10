@@ -54,34 +54,51 @@
       });
       toc.hidden = false;
 
-      if ('IntersectionObserver' in window) {
-        var visible = new Set();
-        var setActive = function () {
-          var activeIndex = -1;
-          h2s.forEach(function (h, i) {
-            if (visible.has(h) && activeIndex === -1) activeIndex = i;
+      // Scroll spy: the active section is the last h2 whose top has passed
+      // just below the sticky header (same offset used for anchor jumps).
+      var currentIndex = null;
+      var ticking = false;
+      var setActive = function () {
+        ticking = false;
+        var offset = (parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0) + 8;
+        var activeIndex = -1;
+        for (var i = 0; i < h2s.length; i++) {
+          if (h2s[i].getBoundingClientRect().top <= offset) activeIndex = i;
+          else break;
+        }
+        // At the bottom of the page, later sections may never reach the
+        // offset line: prefer the linked section if on screen, else the last.
+        var doc = document.documentElement;
+        if (window.innerHeight + window.scrollY >= doc.scrollHeight - 2) {
+          var onScreen = function (h) {
+            var top = h.getBoundingClientRect().top;
+            return top >= 0 && top < window.innerHeight;
+          };
+          var hashIndex = h2s.findIndex(function (h) {
+            return '#' + h.id === decodeURIComponent(location.hash);
           });
-          if (activeIndex === -1) {
-            // Nothing in view: use the last heading above the viewport.
-            h2s.forEach(function (h, i) {
-              if (h.getBoundingClientRect().top < 0) activeIndex = i;
-            });
-          }
-          links.forEach(function (a, i) {
-            a.classList.toggle('is-active', i === activeIndex);
-            if (i === activeIndex) a.setAttribute('aria-current', 'location');
-            else a.removeAttribute('aria-current');
-          });
-        };
-        var observer = new IntersectionObserver(function (entries) {
-          entries.forEach(function (e) {
-            if (e.isIntersecting) visible.add(e.target);
-            else visible.delete(e.target);
-          });
-          setActive();
-        }, { rootMargin: '-80px 0px -55% 0px' });
-        h2s.forEach(function (h) { observer.observe(h); });
-      }
+          if (hashIndex > activeIndex && onScreen(h2s[hashIndex])) activeIndex = hashIndex;
+          else if (onScreen(h2s[h2s.length - 1])) activeIndex = h2s.length - 1;
+        }
+        if (activeIndex === currentIndex) return;
+        currentIndex = activeIndex;
+        links.forEach(function (a, i) {
+          a.classList.toggle('is-active', i === activeIndex);
+          if (i === activeIndex) a.setAttribute('aria-current', 'location');
+          else a.removeAttribute('aria-current');
+        });
+      };
+      var requestUpdate = function () {
+        if (!ticking) {
+          ticking = true;
+          window.requestAnimationFrame(setActive);
+        }
+      };
+      window.addEventListener('scroll', requestUpdate, { passive: true });
+      window.addEventListener('resize', requestUpdate);
+      window.addEventListener('load', requestUpdate);
+      window.addEventListener('hashchange', requestUpdate);
+      setActive();
     } else if (layout) {
       layout.classList.add('no-toc');
     }
