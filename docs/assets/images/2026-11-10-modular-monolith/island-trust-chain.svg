@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520" role="img" aria-labelledby="t d">
+  <title id="t">Loading code you didn't compile</title>
+  <desc id="d">A pipeline in two lanes. On the server: the registry in code fixes the remote's contract major version, audience, scopes and allowed origins; the manifest is read with a timeout, no redirects and a size cap; it is parsed as untrusted input and checked against the registry; the result is an entry URL and its integrity hash, with nothing secret. In the browser: the entry is preloaded with its integrity hash, imported, checked for the contract's shape, and mounted. Then the island asks for a short-lived token and its API verifies it against the host's public keys. Every step before mounting can fail into a localized notice with Try again while the rest of the page keeps working.</desc>
+  <style>
+    .halo { paint-order: stroke; stroke: #12171e; stroke-width: 5px; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161b22"/>
+      <stop offset="1" stop-color="#10151c"/>
+    </linearGradient>
+    <radialGradient id="spot" cx="0.5" cy="0" r="0.9">
+      <stop offset="0" stop-color="#f5c062" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#f5c062" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="#2d3644" fill-opacity="0.55"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feFlood flood-color="#f5c062" flood-opacity="0.28"/>
+      <feComposite in2="blur" operator="in" result="tint"/>
+      <feMerge><feMergeNode in="tint"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6e7681"/>
+    </marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f5c062"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f85149"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="959" height="519" rx="12" fill="url(#bg)" stroke="#2d3644"/>
+  <rect x="0.5" y="0.5" width="959" height="519" rx="12" fill="url(#dots)"/>
+  <rect x="0.5" y="0.5" width="959" height="519" rx="12" fill="url(#spot)"/>
+  <path d="M0.5,36 H959.5" stroke="#2d3644"/>
+  <path d="M12.5,0.5 H947.5 A12,12 0 0 1 959.5,12.5 V36 H0.5 V12.5 A12,12 0 0 1 12.5,0.5 Z" fill="#0d1117" fill-opacity="0.55"/>
+  <circle cx="22" cy="18" r="5" fill="#f85149" fill-opacity="0.85"/>
+  <circle cx="40" cy="18" r="5" fill="#f5c062" fill-opacity="0.85"/>
+  <circle cx="58" cy="18" r="5" fill="#3fb950" fill-opacity="0.85"/>
+  <text x="480.0" y="22" font-size="11" fill="#8b96a5" text-anchor="middle" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">~/dts/diagrams/<tspan fill="#d0d7de">island-trust-chain.svg</tspan></text>
+  <text x="24" y="66" font-size="15" font-weight="700" fill="#e6edf3" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace"><tspan fill="#f5c062">## </tspan>Loading code you didn't compile</text>
+  <text x="936" y="66" font-size="11.5" fill="#8b96a5" text-anchor="end" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">every step can refuse · a bad hash means nothing runs</text>
+  <g transform="translate(0 66)">
+    <text x="24" y="20" font-size="10.5" fill="#56d4dd" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">SERVER</text>
+    <text x="84" y="20" font-size="10.5" fill="#8b96a5" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">page loader → run(ResolveRemoteMount)</text>
+    <rect x="24" y="34" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="24" y="34" width="164" height="92" rx="8" fill="#f5c062" fill-opacity="0.08" stroke="#f5c062" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="42" cy="52" r="10" fill="#f5c062" fill-opacity="0.25" stroke="#f5c062"/>
+    <text x="42" y="56" font-size="10.5" fill="#f5c062" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">1</text>
+    <text x="58" y="57" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">registry</text>
+    <text x="36" y="80" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">in code: the trust anchor</text>
+    <text x="36" y="96" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">contract major · audience</text>
+    <text x="36" y="112" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">scopes · allowed origins</text>
+    <line x1="190" y1="80" x2="208" y2="80" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="210" y="34" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="210" y="34" width="164" height="92" rx="8" fill="#39c5cf" fill-opacity="0.08" stroke="#39c5cf" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="228" cy="52" r="10" fill="#39c5cf" fill-opacity="0.25" stroke="#39c5cf"/>
+    <text x="228" y="56" font-size="10.5" fill="#56d4dd" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">2</text>
+    <text x="244" y="57" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">read manifest</text>
+    <text x="222" y="80" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">ManifestSource port</text>
+    <text x="222" y="96" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">1.5 s · no redirects</text>
+    <text x="222" y="112" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">64 KB cap · 60 s cache</text>
+    <line x1="376" y1="80" x2="394" y2="80" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="396" y="34" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="396" y="34" width="164" height="92" rx="8" fill="#39c5cf" fill-opacity="0.08" stroke="#39c5cf" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="414" cy="52" r="10" fill="#39c5cf" fill-opacity="0.25" stroke="#39c5cf"/>
+    <text x="414" y="56" font-size="10.5" fill="#56d4dd" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">3</text>
+    <text x="430" y="57" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">parse</text>
+    <text x="408" y="80" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">untrusted JSON</text>
+    <text x="408" y="96" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">relative .js entry</text>
+    <text x="408" y="112" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">sha384 · EN + FR</text>
+    <line x1="562" y1="80" x2="580" y2="80" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="582" y="34" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="582" y="34" width="164" height="92" rx="8" fill="#39c5cf" fill-opacity="0.08" stroke="#39c5cf" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="600" cy="52" r="10" fill="#39c5cf" fill-opacity="0.25" stroke="#39c5cf"/>
+    <text x="600" y="56" font-size="10.5" fill="#56d4dd" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">4</text>
+    <text x="616" y="57" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">check</text>
+    <text x="594" y="80" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">same major version</text>
+    <text x="594" y="96" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">same audience</text>
+    <text x="594" y="112" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">HTTPS, approved origin</text>
+    <line x1="748" y1="80" x2="766" y2="80" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="768" y="34" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="768" y="34" width="164" height="92" rx="8" fill="#3fb950" fill-opacity="0.08" stroke="#3fb950" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="786" cy="52" r="10" fill="#3fb950" fill-opacity="0.25" stroke="#3fb950"/>
+    <text x="786" y="56" font-size="10.5" fill="#56d364" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">5</text>
+    <text x="802" y="57" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">RemoteMount</text>
+    <text x="780" y="80" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">entry URL + integrity</text>
+    <text x="780" y="96" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">no token</text>
+    <text x="780" y="112" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">nothing secret</text>
+    <path d="M850,128 V150 H106 V176" fill="none" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <text x="480" y="145" font-size="10.5" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" class="halo">loader data → SSR stops at the chrome</text>
+    <text x="24" y="172" font-size="10.5" fill="#ff7b72" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">BROWSER</text>
+    <rect x="24" y="184" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="24" y="184" width="164" height="92" rx="8" fill="#f85149" fill-opacity="0.08" stroke="#f85149" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="42" cy="202" r="10" fill="#f85149" fill-opacity="0.25" stroke="#f85149"/>
+    <text x="42" y="206" font-size="10.5" fill="#ff7b72" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">6</text>
+    <text x="58" y="207" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">preload</text>
+    <text x="36" y="230" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">&lt;link modulepreload</text>
+    <text x="36" y="246" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"> integrity crossorigin&gt;</text>
+    <text x="36" y="262" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">browser checks the hash</text>
+    <line x1="190" y1="230" x2="208" y2="230" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="210" y="184" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="210" y="184" width="164" height="92" rx="8" fill="#f85149" fill-opacity="0.08" stroke="#f85149" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="228" cy="202" r="10" fill="#f85149" fill-opacity="0.25" stroke="#f85149"/>
+    <text x="228" y="206" font-size="10.5" fill="#ff7b72" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">7</text>
+    <text x="244" y="207" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">import()</text>
+    <text x="222" y="230" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">the only dynamic</text>
+    <text x="222" y="246" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">import in the repo</text>
+    <text x="222" y="262" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">(from the module map)</text>
+    <line x1="376" y1="230" x2="394" y2="230" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="396" y="184" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="396" y="184" width="164" height="92" rx="8" fill="#f85149" fill-opacity="0.08" stroke="#f85149" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="414" cy="202" r="10" fill="#f85149" fill-opacity="0.25" stroke="#f85149"/>
+    <text x="414" y="206" font-size="10.5" fill="#ff7b72" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">8</text>
+    <text x="430" y="207" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">shape check</text>
+    <text x="408" y="230" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">isRemoteModule()</text>
+    <text x="408" y="246" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">same contract major</text>
+    <text x="408" y="262" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">exports mount()</text>
+    <line x1="562" y1="230" x2="580" y2="230" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="582" y="184" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="582" y="184" width="164" height="92" rx="8" fill="#f0883e" fill-opacity="0.08" stroke="#f0883e" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="600" cy="202" r="10" fill="#f0883e" fill-opacity="0.25" stroke="#f0883e"/>
+    <text x="600" y="206" font-size="10.5" fill="#ffa657" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">9</text>
+    <text x="616" y="207" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">mount(el, ctx)</text>
+    <text x="594" y="230" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">shadow root</text>
+    <text x="594" y="246" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">throws → notice</text>
+    <text x="594" y="262" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">late result → ignored</text>
+    <line x1="748" y1="230" x2="766" y2="230" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="768" y="184" width="164" height="92" rx="8" fill="#0d1117" filter="url(#shadow)"/><rect x="768" y="184" width="164" height="92" rx="8" fill="#bc8cff" fill-opacity="0.08" stroke="#bc8cff" stroke-opacity="0.9" stroke-width="1.4"/>
+    <circle cx="786" cy="202" r="10" fill="#bc8cff" fill-opacity="0.25" stroke="#bc8cff"/>
+    <text x="786" y="206" font-size="10.5" fill="#d2a8ff" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">10</text>
+    <text x="802" y="207" font-size="11.5" fill="#e6edf3" text-anchor="start" font-weight="700" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">token + API</text>
+    <text x="780" y="230" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">fetcher → 120 s token</text>
+    <text x="780" y="246" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">API: jwtVerify(JWKS)</text>
+    <text x="780" y="262" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">records by verified sub</text>
+    <line x1="106" y1="278" x2="106" y2="330" stroke="#f85149" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#ar)"/>
+    <line x1="292" y1="278" x2="292" y2="330" stroke="#f85149" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#ar)"/>
+    <line x1="478" y1="278" x2="478" y2="330" stroke="#f85149" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#ar)"/>
+    <line x1="664" y1="278" x2="664" y2="330" stroke="#f85149" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#ar)"/>
+    <rect x="24" y="334" width="912" height="50" rx="8" fill="#0d1117"/><rect x="24" y="334" width="912" height="50" rx="8" fill="#f85149" fill-opacity="0.08" stroke="#f85149" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="480" y="356" font-size="12" text-anchor="middle" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#ff7b72" font-weight="700">fails in place: no island on the page<tspan fill="#d0d7de" font-weight="400">  ·  page answers 200  ·  chrome, side nav and toggle keep working</tspan></text>
+    <text x="480" y="374" font-size="10.5" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">server failures → typed errors → unavailable / incompatible notice  ·  browser failures → the same notice + Try again (?attempt=N)</text>
+    <text x="24" y="412" font-size="10.5" fill="#8b96a5" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">Failing at 6 or 7 means none of the island's code runs. Integrity covers the one entry file (the build allows exactly one chunk), but not someone who</text>
+    <text x="24" y="428" font-size="10.5" fill="#8b96a5" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">controls the island's server: they could change the manifest and the entry together. That is a trust decision, made in the registry.</text>
+  </g>
+</svg>

@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="620" viewBox="0 0 920 620" role="img" aria-labelledby="t d">
+  <title id="t">The island: one page, two runtimes</title>
+  <desc id="d">Inside one browser document on one origin, the host page is rendered by React Router on the server: the chrome, the side navigation, the language toggle and the RemoteOutlet. The island renders in the browser with Preact inside an open shadow root, which scopes styles only. Between them sits the mount contract, a package with no dependencies: the island calls navigate and getAccessToken on the host, and the host calls the island back through onLocationChange. Below the browser, the host server mints short-lived tokens and publishes its public keys; the island's own server serves its manifest, its entry and an API that verifies tokens against the host's keys.</desc>
+  <style>
+    .halo { paint-order: stroke; stroke: #12171e; stroke-width: 5px; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161b22"/>
+      <stop offset="1" stop-color="#10151c"/>
+    </linearGradient>
+    <radialGradient id="spot" cx="0.5" cy="0" r="0.9">
+      <stop offset="0" stop-color="#f5c062" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#f5c062" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="#2d3644" fill-opacity="0.55"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feFlood flood-color="#f5c062" flood-opacity="0.28"/>
+      <feComposite in2="blur" operator="in" result="tint"/>
+      <feMerge><feMergeNode in="tint"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6e7681"/>
+    </marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f5c062"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f85149"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="919" height="619" rx="12" fill="url(#bg)" stroke="#2d3644"/>
+  <rect x="0.5" y="0.5" width="919" height="619" rx="12" fill="url(#dots)"/>
+  <rect x="0.5" y="0.5" width="919" height="619" rx="12" fill="url(#spot)"/>
+  <path d="M0.5,36 H919.5" stroke="#2d3644"/>
+  <path d="M12.5,0.5 H907.5 A12,12 0 0 1 919.5,12.5 V36 H0.5 V12.5 A12,12 0 0 1 12.5,0.5 Z" fill="#0d1117" fill-opacity="0.55"/>
+  <circle cx="22" cy="18" r="5" fill="#f85149" fill-opacity="0.85"/>
+  <circle cx="40" cy="18" r="5" fill="#f5c062" fill-opacity="0.85"/>
+  <circle cx="58" cy="18" r="5" fill="#3fb950" fill-opacity="0.85"/>
+  <text x="460.0" y="22" font-size="11" fill="#8b96a5" text-anchor="middle" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">~/dts/diagrams/<tspan fill="#d0d7de">island-anatomy.svg</tspan></text>
+  <text x="24" y="66" font-size="15" font-weight="700" fill="#e6edf3" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace"><tspan fill="#f5c062">## </tspan>The island: one page, two runtimes</text>
+  <text x="896" y="66" font-size="11.5" fill="#8b96a5" text-anchor="end" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">only the mount contract crosses the line</text>
+  <g transform="translate(0 62)">
+    <rect x="20" y="12" width="880" height="352" rx="12" fill="#0d1117"/><rect x="20" y="12" width="880" height="352" rx="12" fill="#484f58" fill-opacity="0.03" stroke="#484f58" stroke-opacity="0.9" stroke-width="1.4" stroke-dasharray="6 4"/>
+    <text x="36" y="34" font-size="11.5" fill="#8b96a5" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">browser · one document · one origin</text>
+    <rect x="40" y="48" width="320" height="296" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="40" y="48" width="320" height="296" rx="10" fill="#f85149" fill-opacity="0.07" stroke="#f85149" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="56" y="72" font-size="13" fill="#ff7b72" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">host page</text>
+    <text x="344" y="72" font-size="10.5" fill="#8b96a5" text-anchor="end" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">React Router 8 · SSR</text>
+    <rect x="56" y="86" width="288" height="22" rx="4" fill="#f5c062" fill-opacity="0.18" stroke="#f5c062" stroke-opacity="0.6"/>
+    <text x="66" y="101" font-size="10.5" fill="#e6edf3" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">chrome · account menu · EN/FR toggle</text>
+    <rect x="56" y="116" width="78" height="212" rx="4" fill="#58a6ff" fill-opacity="0.08" stroke="#58a6ff" stroke-opacity="0.5"/>
+    <text x="95" y="134" font-size="10.5" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">side nav</text>
+    <rect x="66" y="146" width="58" height="8" rx="4" fill="#a9b4c2" fill-opacity="0.45"/>
+    <rect x="66" y="168" width="58" height="8" rx="4" fill="#a9b4c2" fill-opacity="0.45"/>
+    <rect x="66" y="190" width="58" height="8" rx="4" fill="#a9b4c2" fill-opacity="0.45"/>
+    <rect x="66" y="212" width="58" height="8" rx="4" fill="#a9b4c2" fill-opacity="0.45"/>
+    <rect x="66" y="234" width="58" height="8" rx="4" fill="#a9b4c2" fill-opacity="0.45"/>
+    <rect x="144" y="116" width="200" height="212" rx="6" fill="#0d1117"/><rect x="144" y="116" width="200" height="212" rx="6" fill="#f85149" fill-opacity="0.05" stroke="#f85149" stroke-opacity="0.9" stroke-width="1.4" stroke-dasharray="4 3"/>
+    <text x="244" y="136" font-size="11.5" fill="#e6edf3" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">RemoteOutlet</text>
+    <text x="156" y="162" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="170" y="162" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">owns history</text>
+    <text x="156" y="182" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="170" y="182" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">loads + verifies the entry</text>
+    <text x="156" y="202" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="170" y="202" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">builds ctx once per mount</text>
+    <text x="156" y="222" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="170" y="222" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">token fetcher</text>
+    <text x="156" y="242" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="170" y="242" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">notice + Try again</text>
+    <text x="244" y="314" font-size="10" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">server-rendered: chrome + loading</text>
+    <rect x="384" y="112" width="152" height="184" rx="10" fill="#0d1117" filter="url(#glow)"/><rect x="384" y="112" width="152" height="184" rx="10" fill="#f5c062" fill-opacity="0.08" stroke="#f5c062" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="460" y="134" font-size="11" fill="#f5c062" text-anchor="middle" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">@app/mfe-contract</text>
+    <text x="460" y="150" font-size="10" fill="#a9b4c2" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">'app-mfe/1' · no deps</text>
+    <text x="460" y="176" font-size="10.5" fill="#d2a8ff" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">navigate(to)</text>
+    <line x1="572" y1="184" x2="348" y2="184" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <text x="460" y="216" font-size="10.5" fill="#d2a8ff" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">getAccessToken()</text>
+    <line x1="572" y1="224" x2="348" y2="224" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <text x="460" y="256" font-size="10.5" fill="#d2a8ff" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">onLocationChange(cb)</text>
+    <line x1="348" y1="264" x2="572" y2="264" stroke="#f5c062" stroke-width="1.4" marker-end="url(#aa)"/>
+    <rect x="576" y="48" width="304" height="296" rx="10" fill="#0d1117" filter="url(#shadow)"/>
+    <rect x="576" y="48" width="304" height="296" rx="10" fill="#f0883e" fill-opacity="0.07" stroke="#f0883e" stroke-width="1.6" stroke-dasharray="7 4"/>
+    <text x="592" y="72" font-size="13" fill="#ffa657" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">island</text>
+    <text x="864" y="72" font-size="10.5" fill="#8b96a5" text-anchor="end" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">Preact · browser only</text>
+    <rect x="612.0" y="86.0" width="232.0" height="20" rx="10.0" fill="#0d1117"/><rect x="612.0" y="86.0" width="232.0" height="20" rx="10.0" fill="#f0883e" fill-opacity="0.14" stroke="#f0883e" stroke-opacity="0.85"/>
+    <text x="728" y="99.42" font-size="9.5" fill="#ffa657" text-anchor="middle" font-weight="600" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">open shadow root · scopes styles only</text>
+    <rect x="596" y="118" width="264" height="40" rx="6" fill="#0d1117"/><rect x="596" y="118" width="264" height="40" rx="6" fill="#f0883e" fill-opacity="0.08" stroke="#f0883e" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="608" y="135" font-size="11" fill="#ffa657" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">ui/</text>
+    <text x="608" y="150" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">SlipList · SlipDetail</text>
+    <rect x="596" y="168" width="264" height="40" rx="6" fill="#0d1117"/><rect x="596" y="168" width="264" height="40" rx="6" fill="#bc8cff" fill-opacity="0.08" stroke="#bc8cff" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="608" y="185" font-size="11" fill="#d2a8ff" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">application/</text>
+    <text x="608" y="200" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">ListSlipsByYear · ViewSlip</text>
+    <rect x="596" y="218" width="264" height="40" rx="6" fill="#0d1117"/><rect x="596" y="218" width="264" height="40" rx="6" fill="#f5c062" fill-opacity="0.08" stroke="#f5c062" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="608" y="235" font-size="11" fill="#f5c062" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">domain/</text>
+    <text x="608" y="250" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">TaxSlip · TaxYear · Money</text>
+    <rect x="596" y="268" width="264" height="40" rx="6" fill="#0d1117"/><rect x="596" y="268" width="264" height="40" rx="6" fill="#58a6ff" fill-opacity="0.08" stroke="#58a6ff" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="608" y="285" font-size="11" fill="#79c0ff" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">infrastructure/</text>
+    <text x="608" y="300" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">HostNavigator · CachedAccessTokens</text>
+    <rect x="40" y="404" width="400" height="120" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="40" y="404" width="400" height="120" rx="10" fill="#39c5cf" fill-opacity="0.07" stroke="#39c5cf" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="56" y="428" font-size="12.5" fill="#56d4dd" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">host server</text>
+    <text x="424" y="428" font-size="10.5" fill="#8b96a5" text-anchor="end" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">Effect · same deployment as the modules</text>
+    <text x="56" y="452" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="70" y="452" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">SSR: chrome, heading, loading state (no island content)</text>
+    <text x="56" y="471" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="70" y="471" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">POST /mfe-access/:remoteId → identity mints a 120 s token</text>
+    <text x="56" y="490" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="70" y="490" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">public JWKS for delegated tokens</text>
+    <text x="56" y="509" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="70" y="509" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">reads the island's manifest (untrusted)</text>
+    <rect x="480" y="404" width="400" height="120" rx="10" fill="#0d1117" filter="url(#shadow)"/><rect x="480" y="404" width="400" height="120" rx="10" fill="#f0883e" fill-opacity="0.07" stroke="#f0883e" stroke-opacity="0.9" stroke-width="1.4"/>
+    <text x="496" y="428" font-size="12.5" fill="#ffa657" text-anchor="start" font-weight="700" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">island server</text>
+    <text x="864" y="428" font-size="10.5" fill="#8b96a5" text-anchor="end" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">its own build, image and release</text>
+    <text x="496" y="452" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="510" y="452" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">manifest.json: entry + sha384 integrity</text>
+    <text x="496" y="471" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="510" y="471" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">mount.&lt;hash&gt;.js: one ES module</text>
+    <text x="496" y="490" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="510" y="490" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">api/v1: verifies the token against the host JWKS</text>
+    <text x="496" y="509" font-size="11" fill="#f5c062" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">›</text>
+    <text x="510" y="509" font-size="11" fill="#d0d7de" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">selects records by the verified subject</text>
+    <line x1="200" y1="346" x2="200" y2="400" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="200" y1="400" x2="200" y2="346" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="208" y="380" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" class="halo">HTML · token route</text>
+    <line x1="728" y1="346" x2="728" y2="400" stroke="#6e7681" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="736" y="380" font-size="10.5" fill="#a9b4c2" text-anchor="start" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace" class="halo">Authorization: Bearer …</text>
+    <path d="M440,470 H480" fill="none" stroke="#484f58" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#a)"/>
+    <text x="460" y="462" font-size="9.5" fill="#8b96a5" text-anchor="middle" font-weight="400" font-family="'JetBrains Mono', 'Fira Code', ui-monospace, Consolas, Menlo, monospace">JWKS</text>
+  </g>
+</svg>

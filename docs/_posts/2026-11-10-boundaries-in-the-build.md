@@ -24,12 +24,14 @@ This post walks through how that works. To keep it concrete, I'll follow one req
 opens `/en/jobs` to see job postings that match their experience.
 
 One trade-off up front, so it doesn't feel hidden later: every team ships on the same release train. If a team truly
-needs to deploy on its own schedule, this design doesn't give them that. In exchange you get no version skew between
-pages, no composition layer to run, one developer experience, and contracts the compiler checks.
+needs to deploy on its own schedule, the modules don't give them that. Near the end I'll show the one narrow exception
+I made, and what it costs. In exchange you get no version skew between pages, no composition layer to run, one
+developer experience, and contracts the compiler checks.
 
 ## The shape: one app, many packages
 
-The repository has two kinds of workspace: one application and many packages.
+The repository has two kinds of workspace: applications and packages. One application is the product. The other is
+the exception I just mentioned, and I'll come back to it near the end.
 
 ![The app at the top wires in every package; modules in the middle each publish a small API; ui and the kernel sit at the bottom]({{ '/assets/images/2026-11-10-modular-monolith/repo-map.svg' | relative_url }}){: .diagram style="background:none;padding:0"}
 
@@ -41,6 +43,7 @@ apps/web/                  the application: one build, one process, one image
   app/routes.ts            React Router's route config, built from the modules
   app/register.ts          types the kernel with the real app (more on this later)
   app/routes/layouts/      three layouts; the language page and the 404
+apps/cra-tax-slips/        the one exception: a frontend built and deployed on its own (near the end)
 packages/
   kernel/                  shared kernel: the Effect ↔ React Router bridge, request scope, module contract
   ui/                      the design system
@@ -49,6 +52,8 @@ packages/
   benefits/                the program catalogue and the benefits finder
   jobs/                    job postings matched to the citizen, and their shortlist
   dashboard/               the account's home page
+  mfe-host/                mounts the exception inside the account
+  mfe-contract/            the mount contract both sides share
   …                        payments, employment records, and a few more
 ```
 
@@ -167,8 +172,11 @@ eye:
 - **Layering** inside each module, as described above.
 - **Owned infrastructure.** Only the identity module may use the OIDC client or Redis, and only identity may make
   outbound network calls. Every other module reaches the outside world through a port.
+- **No dynamic code.** An `import()` of anything but a string literal is allowed in exactly one file, and you'll meet
+  it near the end.
+- **Other applications** may depend on shared packages only, never on a module.
 
-`CODEOWNERS` covers the social side. Each module belongs to one team. The contract files (`api.ts` and `package.json`)
+`CODEOWNERS` covers the social side. Each module, and each application, belongs to one team. The contract files (`api.ts` and `package.json`)
 belong to an architecture group, so adding an edge to the module graph is a reviewed decision. The boundaries script
 even checks that `CODEOWNERS` keeps up: every workspace has an owner, and every contract file is owned by the
 architecture group alone.
@@ -366,8 +374,10 @@ The application's `server/runtime.ts` stacks every module's layer in tiers that 
 /** Modules whose layers need no other module's services. */
 const Independent = Layer.mergeAll(Identity.layer, Benefits.layer, EmploymentRecords.layer, Payments.layer);
 
-/** Profile reads employment records. */
-const Profiled = Profile.layer.pipe(Layer.provideMerge(Independent));
+/** Profile reads employment records. The island host reads identity, and manifests through the app's HTTP adapter. */
+const Profiled = Layer.mergeAll(Profile.layer, MfeHost.layer.pipe(Layer.provide(HttpManifestSource.layer))).pipe(
+  Layer.provideMerge(Independent),
+);
 
 /** Jobs reads profile and employment records; employment insurance reads employment records. */
 const Services = Layer.mergeAll(Jobs.layer, EmploymentInsurance.layer).pipe(Layer.provideMerge(Profiled));
@@ -458,7 +468,7 @@ A few more details from the server layer:
 keeps the request's session state in a `Ref`. It provides a `CurrentSession` service to everything inside. It also
 registers a pre-response handler that saves the session and sets or clears the cookie, so even an error response gets
 the cookie right. A session that's never written is never stored. Tokens from the identity provider never reach the
-browser.
+browser. (The island near the end gets a narrower, short-lived token of its own.)
 
 By the time a request reaches the end of this chain, it carries a full Effect context: the application's services, the
 server span, the log annotations, `CurrentRequest` and `CurrentSession`. Next it goes to React Router, which knows
@@ -804,28 +814,326 @@ switches a simulated back-end outage on or off. The composition root implements 
 unpublished demo entry. The end-to-end suite uses them to prove that, for example, the dashboard still renders with
 the payments system down.
 
+## One exception: an area that ships on its own
+
+At the start I said every team rides the same release train. That's true for every module. But one area of this
+account isn't really ours. Tax slips belong to the Canada Revenue Agency (CRA): a different organization, with its own
+team and its own release schedule. The citizen shouldn't notice any of that. They should see the same header, the same
+side navigation, the same session and the same language toggle.
+
+So I made one explicit, limited exception: an **island**. It's a separate frontend, built and deployed on its own, and
+mounted inside the account's chrome under `/en/canada-revenue-agency/*` and `/fr/agence-du-revenu-du-canada/*`. It is
+not the first step toward turning modules into micro-frontends. That isn't on the table. It's what we do for the rare
+area that can't share our build.
+
+To keep this concrete, here's a third request: the same citizen opens `/en/canada-revenue-agency/slips/T4-2025-0003-1`
+to look at last year's T4. Almost everything up to the loader is what you've already seen: the account layout, the
+`requireSignedIn` and `requireConsent` middleware, and `run()`. Only the body of the page is different.
+
+![One page, two runtimes: the host renders the chrome on the server; the island renders inside a shadow root in the browser; only the mount contract crosses between them]({{ '/assets/images/2026-11-10-modular-monolith/island-anatomy.svg' | relative_url }}){: .diagram style="background:none;padding:0"}
+
+### The host is just another module
+
+The host side of the island is an ordinary bounded context, `@app/mfe-host`, built the same way as every other module.
+Its domain knows what a remote manifest and a mount path are. Its ports are a `RemoteRegistry`, a `ManifestSource` and
+`DelegatedAccess`. It reaches identity through an anti-corruption layer, publishes nothing, and sits in the second tier
+of the composition root, next to profile.
+
+Its route table owns one splat page per remote:
+
+```ts
+account: [
+  {
+    id: 'MFE-0001',
+    file: '@app/mfe-host/routes/cra-tax-slips.tsx',
+    paths: { en: '/en/canada-revenue-agency/*', fr: '/fr/agence-du-revenu-du-canada/*' },
+  },
+],
+```
+
+Because it's an `account` page, it gets the account layout and its guards for free. Everything under the prefix belongs
+to the island.
+
+The island itself is a second *application*, `apps/cra-tax-slips/`, with its own build, its own container image, its own
+deployment and its own team in `CODEOWNERS`. The boundaries script has a rule for it: an application other than the main
+one may depend on shared packages only. It can't import a module, published API or not.
+
+### The contract is a package with no dependencies
+
+The only thing the host and the island share is a small package, `@app/mfe-contract`. It has no dependencies at all.
+The kernel can't hold it, because the kernel imports React and the island doesn't use React.
+
+```ts
+export const MOUNT_CONTRACT = 'app-mfe/1';
+
+export interface MountContext {
+  /** The host path the remote owns: `/en/canada-revenue-agency`. */
+  readonly basename: string;
+  /** A change of language is a new document, so a new mount. */
+  readonly language: 'en' | 'fr';
+  /** The host owns history. A target outside `basename` is refused. */
+  navigate(to: string, options?: { readonly replace?: boolean }): void;
+  /** A short-lived bearer token for the remote's API. */
+  getAccessToken(): Promise<string>;
+  /** Called on every host navigation under `basename`. Returns an unsubscribe. */
+  onLocationChange(listener: (location: MountLocation) => void): () => void;
+}
+
+/** Idempotent: aborts in-flight work, removes listeners and empties what it rendered. */
+export type Unmount = () => void;
+
+export interface RemoteModule {
+  readonly contract: string;
+  mount(el: HTMLElement, ctx: MountContext): Unmount;
+}
+```
+
+If you come from Java, think of it as an SPI jar: one interface, implemented on the other side of a deployment boundary.
+Versioning is deliberately strict. The host accepts the same major version only. A minor version may add optional fields
+and nothing else. A breaking change becomes `app-mfe/2`, and the host then supports both versions while remotes migrate.
+
+This is the one place in the post where a boundary is checked at run time instead of by the compiler. The compiler still
+checks each side against the contract. What it can't check is that the code the host loads tomorrow was built against
+the same version. A version check and an integrity hash do that job instead.
+
+### One router
+
+The island lives in the host's page, so it must not fight the host over the URL. The host's React Router owns the
+browser's history, and the island never calls `history.pushState` itself. Its own paths are language-neutral (`/` and
+`/slips/:slipId`). When it wants to move, it asks:
+
+```ts
+navigate: (to, options = {}) => {
+  const target = withinBasename(basename, to);
+  if (target === undefined) {
+    console.warn(`refused a remote's navigation outside ${basename}`);
+    return;
+  }
+  void latest.current.navigate(target, { replace: options.replace === true });
+},
+```
+
+`onLocationChange` is there for the other direction. React Router's `pushState` fires no `popstate` event, so without a
+callback the island couldn't follow the host's own links: the side navigation, back and forward. The host's outlet
+watches `useLocation()` and tells the island whenever the path is still under its prefix.
+
+The language toggle swaps only the bilingual prefix (`/en/canada-revenue-agency` becomes
+`/fr/agence-du-revenu-du-canada`), keeps the rest of the path and reloads the document. A new language is simply a new
+mount. The end-to-end tests check that the side navigation can move into and out of the island without reloading the
+document, and that the toggle keeps the slip that was open.
+
+### A different runtime, the same architecture
+
+The island uses **Preact**, not React, and it uses neither Effect nor our design system. That's on purpose. A different
+runtime proves the two sides really share nothing: no shared React, no clash between two copies of React's hooks, and
+no import maps or Module Federation to keep in step. Preact is about 4 KB, and its TSX looks familiar.
+
+Inside, though, it's built the way everything else in this post is built: a `domain/` (tax slips, tax years, money), an
+`application/` with ports (`TaxSlipsApi`, `AccessTokenProvider`, `Navigator`) and use cases, `infrastructure/` adapters,
+a `ui/`, and a composition root for each mount. The boundaries script's layering rule now covers it too: no Preact in
+`domain/` or `application/`.
+
+The entry the host loads is tiny:
+
+```ts
+export const contract: string = MOUNT_CONTRACT;
+
+export const mount = (el: HTMLElement, ctx: MountContext): Unmount =>
+  createMount({ css, api: (tokens) => new HttpTaxSlipsApi(apiBase(), tokens) })(el, ctx);
+```
+
+`createMount` attaches an open shadow root to `el` and puts the island's styles inside it. That keeps the island's CSS
+from leaking out, and the host's CSS from leaking in. The exceptions are inherited fonts, colours and CSS custom
+properties, which is what we want. To be clear, the shadow root only scopes **styles**. The island's script can still
+reach `document` like any other script on the page.
+
+Each mount also gets one `AbortController`, which `Unmount` aborts synchronously. Preact runs effect cleanups after the
+next paint, and I didn't want a request from a page the citizen has already left to land after that.
+
+### Finding and loading code you didn't compile
+
+This is the part that needs the most care. The host is about to run JavaScript it didn't build.
+
+The trust starts in the host's code, not in configuration. The host keeps a registry of approved remotes, and for each
+one it fixes the contract's major version, the API audience and the scopes the island may be given. Only the URLs come
+from configuration, and only their origins are allowed. The island's build publishes a manifest beside its one hashed
+entry file:
+
+```json
+{
+  "id": "cra-tax-slips",
+  "contract": "app-mfe/1",
+  "entry": "mount.CQsOWGlR.js",
+  "integrity": "sha384-75dc/UUMp40U9yBX7sjtF7Uy243rZNhCyzB0JgHMMuNn7KqSWtEJYDOipLmBXWcR",
+  "api": { "baseUrl": "api/v1/", "audience": "cra-tax-slips-api", "scopes": ["tax-slips:read"] }
+}
+```
+
+On the server, the page's loader runs a `ResolveRemoteMount` use case through `run()`. It reads the manifest through
+the `ManifestSource` port and treats it as untrusted input. It parses every field and checks the result against the
+registry: the same contract major version, the same audience, and an entry and API on the approved origin over HTTPS.
+A manifest can't approve a new origin or ask for a wider scope.
+
+The HTTP adapter for that port lives in the composition root, not in the module, because modules don't touch the
+network. It allows 1.5 seconds, refuses redirects (so a manifest can't send the host somewhere else), caps the size at
+64 KB and caches a good answer for a minute.
+
+Every way this can go wrong is a typed error, and the loader turns each one into a state the page can render:
+
+```ts
+ResolveRemoteMount('cra-tax-slips').pipe(
+  Effect.map((remote): RemotePage => ({ state: 'ready', remote, basename, language })),
+  Effect.catchTags({
+    RemoteNotRegistered: () => unavailable('not registered'),
+    RemoteUnavailable: ({ reason }) => unavailable(reason),
+    ManifestInvalid: ({ reason }) => unavailable(`invalid manifest: ${reason}`),
+    OriginNotApproved: ({ url }) => unavailable(`unapproved origin: ${url}`),
+    RemoteIncompatible: () => incompatible(),
+  }),
+)
+```
+
+What reaches the browser is an entry URL and its integrity hash. There's no token and nothing secret. Server rendering
+stops at the host's chrome, the heading and a loading state. The island renders in the browser.
+
+In the browser, the host's outlet loads the entry in two steps:
+
+```ts
+// The one place in the repository allowed to import() a URL it doesn't know at build time.
+await preload(entryUrl, integrity, timeoutMs); // <link rel="modulepreload" integrity="…" crossorigin>
+const loaded: unknown = await import(/* @vite-ignore */ entryUrl);
+if (!isRemoteModule(loaded)) throw new RemoteLoadFailed(`${entryUrl} does not export this host's mount contract`);
+```
+
+The browser checks the preloaded bytes against the hash before anything runs. If the hash doesn't match, the network
+fails or the load times out, the outlet stops. **None of the island's code runs.** This is what the boundaries script's
+"no dynamic code" rule protects: a non-literal `import()` is allowed in exactly this one file.
+
+![Loading the island: the registry in code anchors trust; the manifest is checked as untrusted input; the browser verifies the entry's hash before running it; every step can refuse and fall back to the notice]({{ '/assets/images/2026-11-10-modular-monolith/island-trust-chain.svg' | relative_url }}){: .diagram style="background:none;padding:0"}
+
+Integrity checks are easy to oversell, so here's exactly what this one covers. It stops a stale, swapped or tampered
+entry file from running in place of the one the manifest names. The island's build enforces a single entry chunk, so
+that hash covers all of its code. It does **not** protect against someone who controls the island's own server, because
+they could change the manifest and the entry together.
+
+One React Router detail is worth stealing. The page's descriptor doesn't change while the citizen moves around inside the
+island, or when the island asks for a token. Neither should reload the loader, because that would remount the island:
+
+```ts
+export const shouldRevalidate: ShouldRevalidateFunction = ({ formAction, formMethod, currentUrl, nextUrl, defaultShouldRevalidate }) => {
+  if (formAction?.startsWith(ACCESS_PREFIX) === true) return false; // a token request
+  if (formMethod === undefined && currentUrl.href !== nextUrl.href) return false; // moving inside the island
+  return defaultShouldRevalidate;
+};
+```
+
+### The one token that reaches the browser
+
+Earlier I wrote that tokens from the identity provider never reach the browser. That's still true, and neither does the
+session. But the island's API is served by another deployment, and it needs to know who's asking. So the island gets a
+different, much narrower token. It is the one documented exception to the rule.
+
+Identity mints it. The identity module publishes a `DelegatedTokenIssuer` over a `DelegationSigner` port. The local
+adapter signs with an ES256 key of its own, which isn't the session secret or the OIDC client key, and identity serves
+the public half as a JWKS. The subject always comes from the request's `CurrentUser`. A caller can name only the
+audience and the scopes, and the host takes those from its registry. The host reaches all this through its own
+anti-corruption layer, just as jobs reaches profile.
+
+The browser asks for a token with a React Router fetcher posting to a host route, `POST /mfe-access/:remoteId`, so the
+host module still never calls `fetch` itself. That route checks, in order:
+
+1. The method is `POST`. Otherwise it answers 405.
+2. The `Origin` header is the host's own origin. Otherwise 403. This stops cross-site callers. It doesn't, and can't,
+   tell the island apart from the rest of the page.
+3. The body doesn't try to choose a subject, an audience or a scope. Otherwise 400.
+4. A citizen is signed in. Otherwise 401, as data and not a redirect, because a script asked, not a person.
+5. The citizen has consented. Otherwise 403.
+
+Then it runs `GrantRemoteAccess` through `run()`, with the same exhaustive `onError` you saw earlier: an unknown remote
+is a 404, a refusal a 403, and an unavailable signer a 503. Every answer is `Cache-Control: no-store`.
+
+The token itself is as small as I could make it. It uses the `at+jwt` type from RFC 9068 and ES256 with a key ID. It
+names one audience (the island's API) and one scope (`tax-slips:read`), and it lives for at most 120 seconds. It has a
+random `jti` and no name, email, session ID or identity-provider token. It never appears in loader data, HTML, URLs, web
+storage or logs. The island keeps it in a closure for one mount, reuses it until 15 seconds before it expires, and drops
+it when it unmounts.
+
+The island's API verifies the token against the host's JWKS and trusts nothing else:
+
+```ts
+const { payload } = await jwtVerify(token, keys, {
+  algorithms: ['ES256'],
+  typ: 'at+jwt',
+  issuer,
+  audience,
+  clockTolerance: 5,
+  requiredClaims: ['sub', 'exp', 'iat', 'scope'],
+});
+```
+
+It then checks the scope and selects records by the verified subject only. Asking for another citizen's slip gets a
+"not found", and there's an end-to-end test for that.
+
+Here's what I accepted, stated plainly. This is a bearer token, not one bound to the sender. While it lives, any script
+on the page can read it. It can't be revoked, so it stays valid for up to two minutes after the citizen signs out. The
+alternative is a backend-for-frontend in identity that proxies the island's API. That keeps the token on the server, but
+it changes the contract and puts the island's traffic through our deployment. For a proof of concept with synthetic
+data, two minutes was an acceptable price. Before production it gets another look, along with whether the subject
+should be a pairwise identifier per audience.
+
+### When the island is down
+
+The island fails like any other part of the page: in its own space. If the manifest can't be read, doesn't parse, names
+an unapproved origin or speaks another major version, the page still answers 200. The chrome, the side navigation and
+the language toggle all work, and the page shows a localized notice with a **Try again** button. If the entry itself
+fails to load or throws while mounting, the outlet shows the same notice.
+
+Two details make Try again actually work. A browser remembers a failed module URL for the life of the document, so a
+retry adds `?attempt=N` to the URL. And a result that arrives after the citizen has left the page is never mounted.
+
+By default the host doesn't read any manifests at all, so it boots and stays ready without the island. In that mode the
+tax slips page simply shows its notice. The end-to-end tests cover the outage, the recovery, and a tampered entry that
+must fail closed.
+
+### An integration boundary, not a sandbox
+
+One last caveat, and it's the most important. Once mounted, the island runs with the host origin's privileges. It runs
+in the same document, with the same cookies, the same DOM and the same token route. In the cluster, its server is even
+served from the host's origin, so it's trusted as well. The mount contract is an **integration** boundary. It is not a
+sandbox.
+
+The registry, the origin allow-list, the integrity check and (before production) a Content Security Policy all stop
+*unapproved* code from running. None of them stops *approved* code that turns malicious. That's why only approved
+remotes from allow-listed origins are registered, and why the data is synthetic for now. A truly untrusted third party
+would need an iframe and a different contract.
+
+The island is a deliberate trade. It buys one area its own release schedule, and it pays with a run-time contract, a
+token flow and a trust decision that someone has to own. That's exactly the kind of cost the rest of this post avoids,
+which is why it's an exception and not a pattern.
+
 ## What we gave up, and what we got
 
-|                              | Network boundaries                       | Boundaries in the build                         |
-| ---------------------------- | ---------------------------------------- | ----------------------------------------------- |
-| Deployables                  | one per area, plus composition           | one                                             |
-| Moving between areas         | often a full page load                   | client-side navigation                          |
-| Contracts between areas      | URLs, payloads, shared session, run time | typed APIs and route keys, build time           |
-| What enforces the boundaries | the network                              | package exports, a lint script, CODEOWNERS      |
-| Version skew between areas   | something you manage                     | can't happen                                    |
-| Releasing an area alone      | yes                                      | no: one release train                           |
+|                              | Network boundaries                       | Boundaries in the build                    | The island (the exception)               |
+| ---------------------------- | ---------------------------------------- | ------------------------------------------ | ---------------------------------------- |
+| Deployables                  | one per area, plus composition           | one                                        | one more: its own build and image        |
+| Moving between areas         | often a full page load                   | client-side navigation                     | client-side, through the host's router   |
+| Contracts between areas      | URLs, payloads, shared session, run time | typed APIs and route keys, build time      | `mount(el, ctx)` and a manifest, run time |
+| What enforces the boundaries | the network                              | package exports, a lint script, CODEOWNERS | contract version, integrity, allow-lists |
+| Version skew between areas   | something you manage                     | can't happen                               | bounded: same major version only         |
+| Releasing an area alone      | yes                                      | no: one release train                      | yes                                      |
 
 The cost is real. Every team ships together, and one team's broken build blocks everyone. Being disciplined about
 `main` and having a fast `check` command (typecheck, lint, boundaries, format and unit tests in one go) matter more here
-than they would elsewhere.
+than they would elsewhere. The island is the escape hatch, and the previous section showed what it costs.
 
 What we got back is everything that tends to make split deployments expensive: no per-area platform, no session format
 that several independently released apps have to agree on, no composition layer, and one developer experience. The
 boundaries didn't go away. They moved somewhere cheaper to check.
 
-This design is probably *not* right if your teams truly need independent release cadences, if they work in different
-languages or runtimes, or if one area needs to scale very differently from the others. In those cases the network is
-earning its keep.
+This design is probably *not* right if *most* of your teams need independent release cadences. One or two areas can be
+islands, but each one adds a run-time contract, a token flow and a trust decision, and a dozen of them means you want a
+different architecture. It's also not right if your teams work in different languages or runtimes on the server, or
+if one area needs to scale very differently from the others. In those cases the network is earning its keep.
 
 ## Wrapping up
 
@@ -839,6 +1147,9 @@ composition root. What made them cheap enough to apply everywhere was the toolin
 - **React Router 8** owns the page: routes from packages, layouts, middleware guards and thin loaders.
 - **A small bridge** carries one typed request context from the socket, through Effect and React Router, into a use
   case and back, and it maps every expected failure exhaustively.
+- **One explicit exception**, an island with its own build and a versioned mount contract, lets the one area that must
+  ship alone do so without a second router, a second session or a second account.
 
 If you take one thing from this post, I'd make it this: a boundary the compiler checks is cheaper than one the network
-enforces, and usually more honest too.
+enforces, and usually more honest too. When a boundary really does have to move to run time, make it one explicit
+exception, and write down exactly what its checks promise and what they don't.
