@@ -181,6 +181,42 @@ belong to an architecture group, so adding an edge to the module graph is a revi
 even checks that `CODEOWNERS` keeps up: every workspace has an owner, and every contract file is owned by the
 architecture group alone.
 
+What the script can't see is GitHub's side of that file. If a team named in `CODEOWNERS` doesn't exist, or can't write
+to the repository, GitHub quietly ignores it. The files it was meant to guard then have no code owner at all, and anyone
+with write access can approve them. So the teams are code too. A small Terraform module, applied with Terragrunt,
+manages every team `CODEOWNERS` names, who is in each one, and each team's access to the repository.
+
+The list of teams lives in one file, `.github/code-owner-teams.json`. The boundaries script checks `CODEOWNERS` against
+it, and the Terragrunt stack reads the same file and passes it to the module, which refuses to plan unless the two
+match. Here's that check, simplified a little:
+
+```terraform
+validation {
+  condition     = toset(keys(var.teams)) == toset(var.required_team_slugs)
+  error_message = "The managed teams must be exactly required_team_slugs (the CODEOWNERS team registry)."
+}
+```
+
+So adding a team is one pull request that touches three files: the registry, `CODEOWNERS` and the stack. Lint checks
+that the first two agree, and the plan checks the third. The stack is applied *before* the pull request merges, so
+`CODEOWNERS` never names a team that doesn't exist yet.
+
+A few details make the teams as hard to drift as the code:
+
+- **Membership is authoritative.** The stack lists who is in each team. Anyone added through GitHub's settings page is
+  removed on the next apply. Joining a team is a pull request against `infra/`, which the platform team owns, so it
+  gets reviewed like any other change.
+- **Every team gets write access.** `CODEOWNERS` ignores an owner that can't push, so the stack grants it explicitly.
+- **An empty team fails to plan.** An authoritative, empty member list would empty the team on GitHub, and quietly
+  leave its files without an owner.
+- **Every name has a project prefix**, like `msca-jobs` or `msca-architecture`, so a team can't be mistaken for
+  another project's team in a shared organization.
+
+Two limits, stated plainly. The state is a local file for now, outside the worktree, with no locking between machines.
+One person applies, and anyone else rebuilds the state by importing what's already on GitHub. A shared backend comes
+before production. And the stack doesn't cover branch protection, the setting that turns a code owner's review into a
+requirement.
+
 That covers the layout. Inside each module, though, the interesting part is how the layers connect: the domain is
 plain code, and everything else reaches the world through ports. That's where Effect comes in.
 
