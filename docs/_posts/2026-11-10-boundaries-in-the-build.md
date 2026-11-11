@@ -96,7 +96,7 @@ packages/jobs/
 
 The folders follow the usual DDD layering, and the rules are checked, not just suggested:
 
-- `domain/` is pure. It doesn't import React, UI code or Effect services. `domain/Match.ts`, for example, is a plain,
+- `domain/` is pure. It doesn't import React, UI code or Effect services. `domain/match.ts`, for example, is a plain,
   explainable scoring function: skills count most, then job title, then years of experience.
 - `application/` orchestrates the domain through ports. It never touches React or HTTP.
 - Route modules and components never import `infrastructure/`. A loader calls a function in `features/`, and that
