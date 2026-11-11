@@ -45,7 +45,7 @@ apps/web/                  the application: one build, one process, one image
   app/routes/layouts/      three layouts; the language page and the 404
 apps/cra-tax-slips/        the one exception: a frontend built and deployed on its own (near the end)
 packages/
-  kernel/                  shared kernel: the Effect ↔ React Router bridge, request scope, module contract
+  kernel/                  shared kernel: the Effect ↔ React Router bridge, request scope, module contract, fragment slot
   ui/                      the design system
   identity/                sign-in, sign-out, the session, page guards
   profile/                 the citizen's record, contact details, consent
@@ -755,6 +755,100 @@ typechecked inside the application's program, every module sees the *real* types
 - A link to a page that doesn't exist, in any module, is a type error, because route keys are those package specifiers.
 - A translation key that doesn't exist is a type error.
 
+## One session, kept apart
+
+The bridge gives every use case the request's whole context, and that context includes the session. Identity needs it,
+because that's where it keeps the citizen's authentication. For every other module, though, a shared session is a risk.
+There's one per browser, shared by every module and by every tab the citizen has open. Left alone, it turns into the
+place where modules quietly pass data to each other, and where two tabs overwrite each other's work.
+
+So each module gets its own slice of the session, and each tab gets its own slice of that.
+
+### A slice per bounded context
+
+Modules still keep the citizen's real data in their own repositories, keyed by the citizen. The session is only for
+short-lived state: what someone is doing during this visit. When a module needs that, it asks identity for its own view
+of the session:
+
+```ts
+export interface ContextSession {
+  readonly context: string;
+  readonly get: Effect.Effect<ContextData>;
+  /** Replaces this context's slice with `f(current)`. */
+  readonly update: (f: (current: ContextData) => ContextData) => Effect.Effect<void>;
+  readonly clear: Effect.Effect<void>;
+  /** Reads another context's slice; denied unless `owner` is in this context's grants. */
+  readonly readFrom: (owner: string) => Effect.Effect<ContextData, SessionAccessDenied>;
+}
+
+export const contextSession = (options: {
+  readonly context: string;
+  /** Other contexts whose slices this one may read. Empty by default. */
+  readonly mayReadFrom?: readonly string[];
+}): Effect.Effect<ContextSession, never, CurrentSession> => /* … */;
+```
+
+`contextSession` is in identity's `published` list, as `./session.server`. The raw `CurrentSession` service isn't. The
+application imports it to type the bridge, but no module can import it, so no module can `yield*` it. The boundaries
+script guards it the same way it guards every other module's internals.
+
+A module reads and writes its own slice, and that's all it can write. It can read another context's slice only if it
+names that context in `mayReadFrom`. Otherwise `readFrom` fails with a typed `SessionAccessDenied`, and the exhaustive
+`onError` you saw in the bridge makes the caller decide what that means. Identity's authentication isn't a slice, so no
+grant reaches it. Even the names are checked: a context can't call its slice `__proto__`.
+
+A grant is a line of code next to the call, so letting one context look at another's state shows up in a diff. It
+can't happen by accident.
+
+There's one more constraint, and it comes from running several replicas. During a rolling deployment, a replica may read
+a session written by an older or a newer version of itself. So the stored shape of the session can only grow. The slices
+went in as one new optional field, validated on the way in like everything else in the store.
+
+### A slice per tab
+
+A slice per context still isn't enough, because the session belongs to the browser, not to the tab. We already saw this
+with the profile form, where someone may have changed the profile "in another tab". The benefits finder ran into it next.
+
+The finder now remembers the citizen's last search, so coming back to `/en/benefits` picks up where they left off. Store
+that search once per session, though, and two tabs fight over it. Search for dental care in one tab and pensions in
+another, return to the first, and it shows you pensions.
+
+The fix is our [tab ID hook]({% post_url 2025-09-05-browser-tab-isolation %}). In the page, `useTabId()` gives each tab
+a short ID of its own, kept in that tab's `sessionStorage` and added to the URL as `tid`. In the loader,
+`getTabId(request)` reads it back. The finder then keeps one selection per tab inside benefits' slice:
+
+```ts
+const slice = contextSession({ context: 'benefits' });
+
+export const rememberSelection = (tabId: string, selection: FinderSelection) =>
+  Effect.gen(function* () {
+    const { update } = yield* slice;
+    yield* update((data) => {
+      const { [tabId]: _replaced, ...others } = tabsOf(data);
+      // Re-inserting last makes the oldest tabs the first to be dropped.
+      const kept = Object.entries(others).slice(-(MAX_TABS - 1));
+      return { ...data, tabs: { ...Object.fromEntries(kept), [tabId]: selection } };
+    });
+  });
+```
+
+The loader's rule is simple. If the URL asks for something (a query, a situation or a view), that's the tab's new
+selection, and it's stored under the tab's ID. If the URL asks for nothing, the tab gets its own last selection back. The
+finder's own links always name a view, so an otherwise empty URL is never mistaken for "give me my last search".
+
+A few small details keep this honest:
+
+- **A `tid` that doesn't look like one the hook generates is ignored.** It never becomes a key in the session.
+- **At most ten tabs are remembered.** The oldest is dropped first, so a long day of browsing can't grow the session
+  without limit.
+- **Session data is untyped JSON.** So each field is parsed again on the way out, like any other input the module
+  didn't just create.
+- **The URL still wins.** Without JavaScript there's no tab ID, so the finder just reads the search from the URL, as it
+  always did. A search is still a plain `GET` form that you can bookmark.
+
+An end-to-end test opens two tabs on one session, searches for something different in each, and checks that each tab
+gets its own search back.
+
 ## Resilience and observability at the seams
 
 A modular monolith can still have partial failures. The modules are in-process, but many of their adapters stand in
@@ -1095,6 +1189,121 @@ By default the host doesn't read any manifests at all, so it boots and stays rea
 tax slips page simply shows its notice. The end-to-end tests cover the outage, the recovery, and a tampered entry that
 must fail closed.
 
+### A piece of the island on someone else's page
+
+The island owns a whole subtree of paths, and sometimes that's more than you need. The dashboard wanted a "Latest tax
+slips" tile on the account's home page, beside its own tiles for EI, jobs and payments. The tile's data, code and release
+schedule are all CRA's. The page around it is the dashboard's.
+
+So a remote can now export **fragments** as well: small pieces that a module's page shows in a slot, with no path of their
+own.
+
+Mounting one turned out to be the easy part. The hard part was the module graph. `mfe-host` publishes nothing, and that's
+deliberate. The dashboard could import it without breaking a rule, but the host already depends on identity and profile.
+The day profile wanted a fragment, the graph would have a cycle. Besides, a module has no business knowing about
+manifests and entry URLs.
+
+The way out is the same inversion the kernel already uses for its types. The kernel declares a slot, and the application
+fills it:
+
+```ts
+/** The fragments a module's page may show, as `<remote>/<fragment>`. */
+export interface RemoteFragmentRegister {
+  readonly 'cra-tax-slips/latest-slips': true;
+}
+
+export type RemoteFragmentId = keyof RemoteFragmentRegister;
+
+/** Provided by the application's signed-in layout; absent in tests and outside it. */
+export const RemoteFragmentContext = createContext<ComponentType<RemoteFragmentContentProps> | undefined>(undefined);
+```
+
+The dashboard renders the kernel's `RemoteFragment` and names the fragment it wants. It owns the frame and the heading,
+and it passes the translated text:
+
+```tsx
+<RemoteFragment id="cra-tax-slips/latest-slips" as="li" heading={t('home.tiles.slips.heading')} headingLevel={3} />
+```
+
+The account layout provides the host's implementation, so every `account` page gets it and nothing else does:
+
+```tsx
+<RemoteFragmentContext value={FragmentSlot}>
+  <AppChrome user={loaderData.user}>{/* … */}</AppChrome>
+</RemoteFragmentContext>
+```
+
+A module names a fragment. It never sees an entry URL, an integrity hash or a token. An identifier that isn't in the
+register is a type error, just like a link to a page that doesn't exist. The register lives in the kernel and belongs to
+the architecture group, so putting a fragment on a page is a reviewed decision. That's governance, not authorization,
+though: the token route can't tell which page asked. The boundaries script has tests for both halves. Any module may
+render the slot through the kernel with no new module edge, and a module that imports `mfe-host` is still refused.
+
+Fragments are an optional addition to the remote's entry, with a protocol of their own, `app-mfe-fragment/1`:
+
+```ts
+export interface FragmentContext {
+  readonly language: 'en' | 'fr';
+  /** The heading level the host's frame uses, so the fragment nests below it. */
+  readonly headingLevel: 2 | 3 | 4 | 5 | 6;
+  getAccessToken(): Promise<string>;
+  /** A host-approved destination inside the remote's own page, as an href; undefined if not approved. */
+  href(destination: string): string | undefined;
+  navigate(destination: string): void;
+}
+
+export interface RemoteModule {
+  readonly contract: string;
+  mount(el: HTMLElement, ctx: MountContext): Unmount;
+  readonly fragments?: Readonly<Record<string, RemoteFragment>>;
+}
+```
+
+A fragment gets less than a page does. It owns no path, so it has no `basename`, no `onLocationChange` and no free-form
+`navigate`. It can only link into the remote's own page, and the host refuses anything else. The page contract stays at
+`app-mfe/1`, so a page-only remote and an older host both keep working. The fragment protocol can change without forcing
+every page to migrate.
+
+The slot resolves its fragment in the browser, after hydration. Server rendering produces the frame, the heading and a
+placeholder sized for the content, so the page barely shifts when the tile arrives. The dashboard's loader doesn't change
+at all, which keeps a slow manifest out of the page's loader. Instead, the host's outlet asks a host resource route,
+`GET /mfe-fragments/:remoteId/:fragmentId`, for a descriptor: the entry URL, its integrity hash, the protocol and a
+state. Never a token. That route runs a `ResolveFragmentMount` use case through `run()`, which adds three gates to the
+page's checks:
+
+1. **The host's registry approves the fragment.** It's listed in code, next to the remote's audience and scopes, and
+   it's checked before any manifest is read.
+2. **The manifest declares it**, with a fragment protocol the host supports.
+3. **The loaded entry exports it**, again with a supported protocol.
+
+A manifest can't add a fragment on its own. From there, the entry loads through the same integrity-checked path as the
+page. One entry exports the page and every fragment, so the single-chunk rule and its hash still cover all of the
+island's code. The browser downloads that entry once, however many slots (or the page) ask for it.
+
+A fragment gets its token from the same `POST /mfe-access/:remoteId` route, with the remote's scopes. That means its
+token is exactly as powerful as the page's. That's acceptable while CRA is read-only. The registry already reserves
+per-fragment scopes, checked at boot to be a subset of the remote's, for the day a remote gains a write scope. There's
+one React Router change here too. On the island's own page, `shouldRevalidate` stopped a token request from re-running
+loaders. On the dashboard, nothing did, so the token fetcher now submits with `defaultShouldRevalidate: false`, and a token
+request re-runs no loader anywhere.
+
+A fragment fails the way the island does, only in a smaller space. If the descriptor can't be had, the hash doesn't
+match, the mount throws or the fragment's API call fails, the tile shows a localized notice with **Try again**, and the
+page still answers 200. The notice doesn't announce itself as an alert or steal focus, because it's one tile on a busy
+page. Signed out or without consent, the tile shows a plain message and never redirects. Even the host's outlet code is
+loaded lazily, so if that download fails, only the slot notices.
+
+Deploys needed one more piece of care. The entry's file name is a hash, so every release replaces it. A dashboard opened
+before a deploy may still hold a descriptor that names the old entry. So the remote keeps serving previous releases'
+entries from a retained directory, which a `retain` step fills in its release pipeline. Manifests are never served from
+there. Rollouts go remote first, host second, and `MFE_FRAGMENTS=off` turns every slot off without redeploying the host.
+A value that isn't valid also means off.
+
+Finally, every response now carries a Content Security Policy in report-only mode. Its `script-src` and `connect-src`
+come from the registry: `'self'` plus each approved remote's origin. It can't be enforced yet, because `'unsafe-inline'`
+stays in `script-src` until server-rendered scripts carry nonces. Until then, it reports violations to a host route,
+where they're logged.
+
 ### An integration boundary, not a sandbox
 
 One last caveat, and it's the most important. Once mounted, the island runs with the host origin's privileges. It runs
@@ -1102,10 +1311,11 @@ in the same document, with the same cookies, the same DOM and the same token rou
 served from the host's origin, so it's trusted as well. The mount contract is an **integration** boundary. It is not a
 sandbox.
 
-The registry, the origin allow-list, the integrity check and (before production) a Content Security Policy all stop
-*unapproved* code from running. None of them stops *approved* code that turns malicious. That's why only approved
-remotes from allow-listed origins are registered, and why the data is synthetic for now. A truly untrusted third party
-would need an iframe and a different contract.
+The registry, the origin allow-list, the integrity check and the Content Security Policy (report-only, for now) all stop
+*unapproved* code from running. None of them stops *approved* code that turns malicious. Fragments widen that exposure:
+they run third-party-built code on the account's busiest page, and they ask for tokens more often. That's why only
+approved remotes from allow-listed origins are registered, and why the data is synthetic for now. A truly untrusted third
+party would need an iframe and a different contract.
 
 The island is a deliberate trade. It buys one area its own release schedule, and it pays with a run-time contract, a
 token flow and a trust decision that someone has to own. That's exactly the kind of cost the rest of this post avoids,
@@ -1147,8 +1357,10 @@ composition root. What made them cheap enough to apply everywhere was the toolin
 - **React Router 8** owns the page: routes from packages, layouts, middleware guards and thin loaders.
 - **A small bridge** carries one typed request context from the socket, through Effect and React Router, into a use
   case and back, and it maps every expected failure exhaustively.
+- **One session, sliced** per bounded context and per tab, so modules and tabs share a sign-in without sharing state.
 - **One explicit exception**, an island with its own build and a versioned mount contract, lets the one area that must
-  ship alone do so without a second router, a second session or a second account.
+  ship alone do so without a second router, a second session or a second account. Its fragments even let it lend a
+  tile to a module's page without either side importing the other.
 
 If you take one thing from this post, I'd make it this: a boundary the compiler checks is cheaper than one the network
 enforces, and usually more honest too. When a boundary really does have to move to run time, make it one explicit
